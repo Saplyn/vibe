@@ -4,7 +4,7 @@ use std::{
 };
 
 use axum::{
-    Router, ServiceExt,
+    Router,
     extract::{
         ConnectInfo, WebSocketUpgrade,
         ws::{Message, WebSocket},
@@ -12,7 +12,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use tracing::{info, level_filters::LevelFilter};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 // LYN: Main

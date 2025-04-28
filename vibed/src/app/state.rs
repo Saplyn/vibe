@@ -1,17 +1,45 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{osc::MinOscMessage, ticker::Ticker};
+use crate::mosc::MinOscMessage;
+
+use super::{communicator::Communicator, ticker::Ticker};
 
 // LYN: State
 
-#[derive(Debug, Default)]
+const DEFAULT_NAME: &str = "Unnamed";
+
+#[derive(Debug, Clone)]
 pub struct AppState {
-    pub meta: Meta,
-    pub patterns: HashMap<String, Pattern>,
-    pub tracks: HashMap<String, Track>,
-    pub ticker: Ticker,
+    pub name: String,
+    pub patterns: Arc<RwLock<HashMap<String, Pattern>>>,
+    pub tracks: Arc<RwLock<HashMap<String, Track>>>,
+    pub ticker: Arc<Mutex<Ticker>>,
+    pub communicator: Arc<RwLock<Communicator>>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        let patterns: Arc<RwLock<HashMap<String, Pattern>>> = Default::default();
+        let tracks: Arc<RwLock<HashMap<String, Track>>> = Default::default();
+        let ticker: Arc<Mutex<Ticker>> = Default::default();
+
+        let communicator = Arc::new(RwLock::new(Communicator::new(
+            patterns.clone(),
+            tracks.clone(),
+            ticker.lock().unwrap().tick_rx(),
+        )));
+
+        Self {
+            name: String::from(DEFAULT_NAME),
+            patterns,
+            tracks,
+            ticker,
+            communicator,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,24 +60,4 @@ pub struct Track {
 pub struct Event {
     pub payload: MinOscMessage,
     pub active: Vec<bool>,
-}
-
-// LYN: Meta
-
-#[derive(Debug)]
-pub struct Meta {
-    pub name: String,
-    pub target_addr: String, // addr & port
-}
-
-const DEFAULT_TARGET_ADDR: &str = "127.0.0.1:3000";
-const DEFAULT_PROJECY_NAME: &str = "Unnamed";
-
-impl Default for Meta {
-    fn default() -> Self {
-        Self {
-            name: String::from(DEFAULT_PROJECY_NAME),
-            target_addr: String::from(DEFAULT_TARGET_ADDR),
-        }
-    }
 }

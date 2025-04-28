@@ -1,23 +1,16 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::RwLock;
 
+use action::{ClientAction, ServerAction};
 use axum::extract::ws::{Message, WebSocket};
-use serde::{Deserialize, Serialize};
 use state::AppState;
-use state::Pattern;
-use state::Track;
 use tracing::info;
 
+pub mod action;
+pub mod communicator;
 pub mod state;
+pub mod ticker;
 
-// LYN: Main Loop
-
-pub async fn handle_connection(
-    mut socket: WebSocket,
-    addr: SocketAddr,
-    state: Arc<RwLock<AppState>>,
-) {
+pub async fn handle_connection(mut socket: WebSocket, addr: SocketAddr, state: AppState) {
     info!("Client connected: {}", addr);
 
     while let Some(Ok(msg)) = socket.recv().await {
@@ -27,13 +20,24 @@ pub async fn handle_connection(
 
                 match action {
                     ServerAction::TickerPlay => {
-                        state.write().unwrap().ticker.play();
+                        state.ticker.lock().unwrap().play();
+                        // TODO: let every connection the update
                     }
                     ServerAction::TickerPause => {
-                        state.write().unwrap().ticker.pause();
+                        state.ticker.lock().unwrap().pause();
+                        // TODO: let every connection the update
                     }
                     ServerAction::TickerStop => {
-                        state.write().unwrap().ticker.stop();
+                        state.ticker.lock().unwrap().stop();
+                        // TODO: let every connection the update
+                    }
+                    ServerAction::TickerSetBpm { bpm } => {
+                        state.ticker.lock().unwrap().set_bpm(bpm);
+                        // TODO: let every connection the update
+                    }
+                    ServerAction::TickerSetCycle { cycle } => {
+                        state.ticker.lock().unwrap().set_cycle(cycle);
+                        // TODO: let every connection the update
                     }
                     _ => {
                         todo!()
@@ -47,42 +51,4 @@ pub async fn handle_connection(
             _ => {}
         }
     }
-}
-
-// LYN: Actions
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ServerAction {
-    MetaSetProjectName { string: String },
-    MetaSetTargetAddr { string: String },
-
-    TrackAdd { name: String },
-    TrackDelete { name: String },
-    TrackEdit { name: String, track: Track },
-
-    PatternAdd { name: String },
-    PatternDelete { name: String },
-    PatternEdit { name: String, pattern: Pattern },
-
-    TickerSetContext { cycle: Option<usize>, bpm: f32 },
-    TickerPlay,
-    TickerPause,
-    TickerStop,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ClientAction {
-    MetaProjectNameUpdated { string: String },
-    MetaTargetUpdated { string: String },
-
-    TrackAdded { name: String, track: Track },
-    TrackDeleted { name: String },
-    TrackEdited { name: String, track: Track },
-
-    PatternAdded { name: String, pattern: Pattern },
-    PatternDeleted { name: String },
-    PatternEdited { name: String, pattern: Pattern },
-
-    TickerContextSwitched { cycle: Option<usize>, bpm: f32 },
-    TickerTick { index: usize },
 }

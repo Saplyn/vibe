@@ -40,7 +40,7 @@ impl Default for Ticker {
 }
 
 impl Ticker {
-    pub fn subscribe(&self) -> watch::Receiver<Option<usize>> {
+    pub fn tick_rx(&self) -> watch::Receiver<Option<usize>> {
         self.tick_rx.clone()
     }
 
@@ -142,6 +142,8 @@ async fn ticker_fn(
                         playing = false;
                         remaining = interval;
                         count = 0;
+                        tick_tx.send(None)
+                            .expect("Tick channel unexpectedly closed");
                     },
 
                     TickerAction::SetBPM(new_bpm) => {

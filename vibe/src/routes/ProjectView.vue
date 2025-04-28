@@ -1,24 +1,26 @@
 <template>
   <div>
-    <Button>uwu</Button>
+    {{ status }}
+    <Button @click="play" icon="pi pi-play" />
+    <Button @click="pause" icon="pi pi-pause" />
+    <Button @click="stop" icon="pi pi-stop" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { error, info } from "@tauri-apps/plugin-log";
-import WebSocket from "@tauri-apps/plugin-websocket";
+import { useWebSocket } from "@vueuse/core";
 
-WebSocket.connect("ws://127.0.0.1:3000")
-  .then((ws) => {
-    info("connected");
+const { status, send } = useWebSocket("ws://127.0.0.1:8000", {
+  autoReconnect: true,
+});
 
-    ws.send("Hello World!").then(() => {
-      info("send hello world");
-    });
-
-    ws.addListener((msg) => {
-      info("Received Message:" + msg);
-    });
-  })
-  .catch((reason) => error("Error: " + reason));
+function play() {
+  send('"TickerPlay"');
+}
+function pause() {
+  send('"TickerPause"');
+}
+function stop() {
+  send('"TickerStop"');
+}
 </script>

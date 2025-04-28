@@ -15,7 +15,6 @@ pub fn run() {
                 .level_for("vibe", LevelFilter::Trace)
                 .build(),
         )
-        .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet])
         .run(tauri::generate_context!())

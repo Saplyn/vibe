@@ -3,68 +3,55 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use app::{ServerAction, handle_connection, state::AppState};
 use axum::{
     Router,
-    extract::{
-        ConnectInfo, WebSocketUpgrade,
-        ws::{Message, WebSocket},
-    },
+    extract::{ConnectInfo, State, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
 };
-use tracing::info;
+use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
-// LYN: Main
+mod app;
+mod osc;
+mod ticker;
+
+const VIBED_SERVER_ADDR: &str = "0.0.0.0:8000";
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new("vibed=trace"))
+        .with_env_filter(EnvFilter::new("{}=info,vibed=trace"))
         .init();
 
     let state = Arc::new(RwLock::new(AppState::default()));
+    let router = Router::new().route("/", get(ws_handler)).with_state(state);
+    let listener = tokio::net::TcpListener::bind(VIBED_SERVER_ADDR)
+        .await
+        .unwrap();
 
-    let app = Router::new().route("/", get(ws_handler)).with_state(state);
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    error!(
+        "{}",
+        serde_json::to_string(&ServerAction::PatternAdd {
+            name: String::from("uwu")
+        })
+        .unwrap()
+    );
 
     info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(
         listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
+        router.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await
     .unwrap();
 }
 
-// LYN: State
-
-#[derive(Debug, Default)]
-struct AppState {}
-
-// LYN: Handlers
-
 async fn ws_handler(
     ws: WebSocketUpgrade,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    state: State<Arc<RwLock<AppState>>>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, addr))
-}
-
-async fn handle_socket(mut socket: WebSocket, addr: SocketAddr) {
-    info!("Client connected: {}", addr);
-
-    while let Some(Ok(msg)) = socket.recv().await {
-        match msg {
-            Message::Text(text) => {
-                info!("Received text from {}: {}", addr, text);
-            }
-            Message::Close(_) => {
-                info!("Client {} disconnected", addr);
-                break;
-            }
-            _ => {}
-        }
-    }
+    ws.on_upgrade(move |socket| handle_connection(socket, addr, state.0))
 }

@@ -1,16 +1,51 @@
 <template>
-  <div class="flex flex-col h-screen w-screen justify-between">
-    <main class="overflow-auto grow">
+  <div class="flex h-screen w-screen flex-col justify-between">
+    <PlayControlBar />
+
+    <main class="grow overflow-auto">
       <RouterView />
     </main>
 
-    <nav class="text-primary-contrast grid grid-flow-col gap-4">
-      <RouterLink class="bg-primary" to="/">Project</RouterLink>
-      <RouterLink class="bg-primary" to="/tracks">Tracks</RouterLink>
-      <RouterLink class="bg-primary" to="/patterns">Patterns</RouterLink>
+    <nav
+      class="border-surface grid grid-flow-col gap-2 rounded-t-lg border-t-4 px-2 pt-2"
+      :class="isFullscreen ? '' : 'pb-2'"
+    >
+      <Button
+        v-for="route in $router.getRoutes()"
+        :severity="$route.path === route.path ? 'primary' : 'secondary'"
+        :class="isFullscreen ? 'rounded-b-none' : ''"
+        :pt:label:class="
+          $route.path === route.path
+            ? 'font-bold'
+            : 'font-bold hidden md:inline'
+        "
+        :label="route.name?.toString()"
+        @click="$router.push(route.path)"
+      >
+        <template #icon>
+          <span class="material-symbols-rounded">{{ route.meta.icon }}</span>
+        </template>
+      </Button>
     </nav>
   </div>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { useWebSocket } from "@vueuse/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { onMounted, provide, ref } from "vue";
 
+const vibedCommWS = useWebSocket("ws://127.0.0.1:8000", {
+  autoReconnect: true,
+});
+provide("vibed-comm-ws", vibedCommWS);
+
+const isFullscreen = ref(false);
+onMounted(async () => {
+  isFullscreen.value = await getCurrentWindow().isMaximized();
+
+  getCurrentWindow().listen("tauri://resize", async (_) => {
+    isFullscreen.value = await getCurrentWindow().isMaximized();
+  });
+});
+</script>

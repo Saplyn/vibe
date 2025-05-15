@@ -1,13 +1,14 @@
 use rosc::OscMessage;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MinOscMessage {
     pub path: String,
     pub args: Vec<MinOscArg>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
 pub enum MinOscArg {
     Float(f32),
     String(String),

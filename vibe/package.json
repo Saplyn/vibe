@@ -17,6 +17,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "@vueuse/core": "^13.1.0",
     "material-symbols": "^0.31.2",
+    "pinia": "^3.0.2",
     "primeicons": "^7.0.0",
     "primevue": "^4.3.3",
     "tailwindcss": "^4.1.4",

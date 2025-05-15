@@ -9,7 +9,7 @@ use tokio::{
     sync::{mpsc, watch},
     time::{Instant, sleep_until},
 };
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
 
 #[derive(Debug)]
 pub enum TickerCommand {
@@ -49,7 +49,9 @@ pub async fn main(state: TickerState) {
         select! {
             _ = &mut sleep_fut, if *playing.read().unwrap() => {
                 trace!("tick {}!", tick);
-                let _ = tick_tx.send(Some(tick == 0));
+                if let Err(err) = tick_tx.send(Some(tick == 0)) {
+                    warn!("Ticker failed to send tick: {}", err);
+                };
                 tick = if tick == 3 {0} else {tick + 1};
                 next_tick = Instant::now() + interval;
                 remaining = interval;
@@ -76,7 +78,9 @@ pub async fn main(state: TickerState) {
                         *playing.write().unwrap() = false;
                         remaining = interval;
                         tick = 0;
-                        let _ = tick_tx.send(None);
+                        if let Err(err) = tick_tx.send(None) {
+                            warn!("Ticker failed to send tick: {}", err);
+                        };
                     },
                     TickerCommand::SetBPM { bpm: new_bpm } => {
                         let mut bpm = bpm.write().unwrap();

@@ -31,15 +31,10 @@
 </template>
 
 <script setup lang="ts">
-import { useWebSocket } from "@vueuse/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { onMounted, provide, ref } from "vue";
+import { onMounted, ref } from "vue";
 
-const vibedCommWS = useWebSocket("ws://127.0.0.1:8000", {
-  autoReconnect: true,
-});
-provide("vibed-comm-ws", vibedCommWS);
-
+// LYN: Fullscreen Detection
 const isFullscreen = ref(false);
 onMounted(async () => {
   isFullscreen.value = await getCurrentWindow().isMaximized();

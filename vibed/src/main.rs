@@ -17,7 +17,7 @@ use state::{AppState, Pattern, Track};
 use ticker::TickerState;
 use tokio::{
     spawn,
-    sync::{broadcast, mpsc, watch},
+    sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
 };
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -81,7 +81,7 @@ fn prepare_app() -> AppState {
     spawn(communicator::main(CommunicatorState {
         patterns: patterns.clone(),
         tracks: tracks.clone(),
-        target_addr: Arc::new(RwLock::new(DEFAULT_TARGET_ADDR.to_string())),
+        target_addr: Arc::new(AsyncRwLock::new(DEFAULT_TARGET_ADDR.to_string())),
         context: None,
         cmd_rx: communicator_cmd_rx,
         tick_rx,

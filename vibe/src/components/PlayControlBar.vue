@@ -2,7 +2,7 @@
   <div class="border-surface flex gap-2 border-b-4 px-4 py-2">
     <!-- LYN: Status -->
     <Button
-      @click="statusDrawerVisible = true"
+      @click="toggleStatusPopover"
       :severity="statusButtonStyle.severity"
       variant="outlined"
     >
@@ -13,22 +13,20 @@
       </template>
     </Button>
 
-    <!-- LYN: Status Drawer -->
-    <Drawer
-      v-model:visible="statusDrawerVisible"
-      header="Vibe Info"
-      position="bottom"
-      class="h-auto"
-    >
+    <!-- LYN: Status Popover -->
+    <Popover ref="statusPopover">
       <Message
         class="mt-1"
-        :severity="vibedCommStatus === 'OPEN' ? 'success' : 'error'"
+        :severity="vibedConnected ? 'success' : 'error'"
         variant="outlined"
       >
-        <span class="font-mono">vibed</span> server
-        {{ vibedCommStatus === "OPEN" ? "connected" : "disconnected" }}
+        <template #icon>
+          <span class="material-symbols-rounded">dns</span>
+        </template>
+        {{ vibedConnected ? "Connected" : "Disconnected" }}
+        to <span class="font-mono">vibed</span> server
       </Message>
-    </Drawer>
+    </Popover>
 
     <!-- LYN: BPM -->
     <span class="w-24">
@@ -82,54 +80,45 @@
 </template>
 
 <script setup lang="ts">
-import { UseWebSocketReturn } from "@vueuse/core";
 import { computed, inject, ref } from "vue";
-import { ServerCommand } from "../types";
+import { UseVibedReturn } from "../composables/useVibed";
 
 const bpm = ref(120);
 const playing = ref(false);
 
-const { status: vibedCommStatus, send } = inject(
-  "vibed-comm-ws",
-) as UseWebSocketReturn<any>;
+const { connected: vibedConnected, command } = inject(
+  "vibed",
+) as UseVibedReturn;
 
 function play() {
   playing.value = true;
-  let cmd: ServerCommand = {
-    action: "TickerPlay",
-  };
-  send(JSON.stringify(cmd));
+  command({ action: "TickerPlay" });
 }
 function pause() {
   playing.value = false;
-  let cmd: ServerCommand = {
-    action: "TickerPause",
-  };
-  send(JSON.stringify(cmd));
+  command({ action: "TickerPause" });
 }
 function stop() {
   playing.value = false;
-  let cmd: ServerCommand = {
-    action: "TickerStop",
-  };
-  send(JSON.stringify(cmd));
+  command({ action: "TickerStop" });
 }
 function setBpm() {
-  console.log("uwu");
-  let cmd: ServerCommand = {
+  command({
     action: "TickerSetBpm",
     payload: { bpm: bpm.value },
-  };
-  send(JSON.stringify(cmd));
+  });
 }
 
-// LYN: Status Drawer
-const statusDrawerVisible = ref(false);
+// LYN: Status Popover
+const statusPopover = ref();
+function toggleStatusPopover(event: MouseEvent) {
+  statusPopover.value.toggle(event);
+}
 
 const statusButtonStyle = computed(() => {
-  if (vibedCommStatus.value === "OPEN") {
+  if (vibedConnected.value) {
     return { icon: "wifi_tethering", severity: "success" };
-    return { icon: "wifi_tethering_error", severity: "success" };
+    return { icon: "wifi_tethering_error", severity: "warn" };
   } else {
     return { icon: "wifi_tethering_off", severity: "danger" };
   }

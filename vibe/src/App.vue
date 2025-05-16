@@ -32,7 +32,19 @@
 
 <script setup lang="ts">
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { onMounted, ref } from "vue";
+import {
+  computed,
+  ComputedRef,
+  DeepReadonly,
+  onMounted,
+  provide,
+  readonly,
+  Ref,
+  ref,
+  UnwrapNestedRefs,
+} from "vue";
+import { get, set, useWebSocket } from "@vueuse/core";
+import { ClientCommand, ServerCommand } from "./types/command";
 
 // LYN: Fullscreen Detection
 const isFullscreen = ref(false);
@@ -42,5 +54,32 @@ onMounted(async () => {
   getCurrentWindow().listen("tauri://resize", async (_) => {
     isFullscreen.value = await getCurrentWindow().isMaximized();
   });
+});
+
+// LYN: Vibed
+const addr = ref("localhost:8000");
+const changeAddr = (newAddr: string) => set(addr, newAddr);
+const wsAddr = computed(() => `ws://${get(addr)}`);
+const ws = useWebSocket(wsAddr, { autoReconnect: true });
+const connected = computed(() => ws.status.value === "OPEN");
+const cmd = computed(() => JSON.parse(ws.data.value) as ClientCommand);
+const send = (cmd: ServerCommand) => ws.send(JSON.stringify(cmd));
+
+// LYN: Vibed (provide)
+export type Vibed = {
+  addr: DeepReadonly<UnwrapNestedRefs<Ref<string, string>>>;
+  changeAddr: (newAddr: string) => void;
+  wsAddr: ComputedRef<string>;
+  connected: ComputedRef<boolean>;
+  cmd: ComputedRef<ClientCommand>;
+  send: (cmd: ServerCommand) => void;
+};
+provide<Vibed>("vibed", {
+  addr: readonly(addr),
+  changeAddr,
+  wsAddr,
+  connected,
+  cmd,
+  send,
 });
 </script>

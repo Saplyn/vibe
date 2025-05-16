@@ -1,76 +1,71 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use tokio::{
+    io::AsyncWriteExt,
     net::TcpStream,
-    sync::{RwLock as AsyncRwLock, mpsc, watch},
+    select,
+    sync::{RwLock as AsyncRwLock, mpsc},
     time::sleep,
 };
 use tracing::{info, warn};
 
-use crate::state::{Pattern, Track};
+#[derive(Debug, Clone)]
+pub struct CommunicatorState {
+    pub target_addr: Arc<AsyncRwLock<String>>,
+}
 
 #[derive(Debug)]
-pub struct CommunicatorState {
-    pub patterns: Arc<RwLock<HashMap<String, Pattern>>>,
-    pub tracks: Arc<RwLock<HashMap<String, Track>>>,
-    pub target_addr: Arc<AsyncRwLock<String>>,
-    pub context: Option<String>, // pattern name, empty for tracks
-
+pub struct CommunicatorArg {
     pub cmd_rx: mpsc::Receiver<CommunicatorCommand>,
-    pub tick_rx: watch::Receiver<Option<bool>>,
 }
 
 #[derive(Debug)]
 pub enum CommunicatorCommand {
     ChangeTargetAddr { addr: String },
-    ChangeContext { pattern_name: Option<String> },
+    // SendMessage { msg: () }
 }
 
-pub async fn main(state: CommunicatorState) {
+pub async fn main(state: CommunicatorState, arg: CommunicatorArg) {
     info!("Communicator started");
 
-    let CommunicatorState {
-        patterns,
-        tracks,
-        target_addr,
-        context,
-        cmd_rx: mut action_rx,
-        tick_rx,
-    } = state;
-
-    let target = {
-        let target_addr = target_addr.read().await;
-        connect_to_target(&target_addr).await
-    };
+    let CommunicatorState { target_addr } = state;
+    let CommunicatorArg { mut cmd_rx } = arg;
 
     loop {
-        if let Some(pattern_name) = &context {
-            let patterns = patterns.read().unwrap();
-            let Some(pattern) = patterns.get(pattern_name) else {
-                warn!("Pattern {} not found", pattern_name);
-                // FIXME: wait for new context change?
-                continue;
-            };
-        } else {
-            todo!("Communicator track play not impled")
+        select! {
+            Some(CommunicatorCommand::ChangeTargetAddr { addr }) = cmd_rx.recv() => {
+                *target_addr.write().await = addr;
+            }
+            else => {
+                match TcpStream::connect(&*target_addr.read().await).await {
+                    Ok(stream) => {
+                        process(stream, &mut cmd_rx).await;
+                    }
+                    Err(err) => {
+                        warn!("Failed to connect to target: {}", err);
+                        sleep(Duration::from_millis(500)).await;
+                    }
+                }
+            }
         }
     }
 }
 
-async fn connect_to_target(target_addr: &str) -> TcpStream {
+async fn process(
+    mut stream: TcpStream,
+    cmd_rx: &mut mpsc::Receiver<CommunicatorCommand>,
+) -> Option<String> {
     loop {
-        match TcpStream::connect(target_addr).await {
-            Ok(stream) => {
-                info!("Connected to target: {}", target_addr);
-                break stream;
+        select! {
+            Some(cmd) = cmd_rx.recv() => {
+                match cmd {
+                    CommunicatorCommand::ChangeTargetAddr { addr } => {
+                        break Some(addr);
+                    }
+                }
             }
-            Err(e) => {
-                warn!("Connection to target failed: {}", e);
-                sleep(Duration::from_millis(500)).await;
+            else => {
+                let _ = stream.write_all(b"uwu;").await;
             }
         }
     }

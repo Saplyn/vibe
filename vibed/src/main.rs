@@ -4,29 +4,25 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use app::handle_connection;
-use axum::{
-    Router,
-    extract::{ConnectInfo, State, WebSocketUpgrade},
-    response::IntoResponse,
-    routing::get,
-};
-use command::ClientCommand;
-use communicator::CommunicatorState;
-use state::{AppState, Pattern, Track};
-use ticker::TickerState;
+use axum::{Router, routing::get};
+use communicator::{CommunicatorArg, CommunicatorState};
+use controller::{ControllerArg, ControllerState};
+use handler::{HandlerState, ws_upgrader};
+use ticker::{TickerArg, TickerState};
 use tokio::{
     spawn,
     sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
 };
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use vibe_types::{
+    command::ClientCommand,
+    models::{Pattern, Track},
+};
 
-mod app;
-mod command;
 mod communicator;
-mod mosc;
-mod state;
+mod controller;
+mod handler;
 mod ticker;
 
 const VIBED_SERVER_ADDR: &str = "0.0.0.0:8000";
@@ -37,11 +33,11 @@ const DEFAULT_TARGET_ADDR: &str = "127.0.0.1:3000";
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new("{}=info,vibed=trace"))
+        .with_env_filter(EnvFilter::new("vibed=trace"))
         .init();
 
-    let state = prepare_app();
-    let router = Router::new().route("/", get(ws_handler)).with_state(state);
+    let state = init_state();
+    let router = Router::new().route("/", get(ws_upgrader)).with_state(state);
     let listener = tokio::net::TcpListener::bind(VIBED_SERVER_ADDR)
         .await
         .unwrap();
@@ -55,46 +51,64 @@ async fn main() {
     .unwrap();
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    state: State<AppState>,
-) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_connection(socket, addr, state.0))
-}
-
-fn prepare_app() -> AppState {
+fn init_state() -> HandlerState {
     // LYN: Spawn Ticker
     let (ticker_cmd_tx, ticker_cmd_rx) = mpsc::channel(32);
     let (tick_tx, tick_rx) = watch::channel(None);
-    spawn(ticker::main(TickerState {
-        bpm: Arc::new(RwLock::new(DEFAULT_BPM)),
-        playing: Arc::new(RwLock::new(false)),
-        cmd_rx: ticker_cmd_rx,
-        tick_tx,
-    }));
+    let ticker_state = TickerState {
+        bpm: Arc::new(AsyncRwLock::new(DEFAULT_BPM)),
+        playing: Arc::new(AsyncRwLock::new(false)),
+    };
+    spawn(ticker::main(
+        ticker_state.clone(),
+        TickerArg {
+            cmd_rx: ticker_cmd_rx,
+            tick_tx,
+        },
+    ));
 
-    // LYN: Spawn Communicator
+    // LYN: Spawn Controller
     let patterns: Arc<RwLock<HashMap<String, Pattern>>> = Default::default();
     let tracks: Arc<RwLock<HashMap<String, Track>>> = Default::default();
+    let (controller_cmd_tx, controller_cmd_rx) = mpsc::channel(32);
+    let controller_state = ControllerState {
+        context: Arc::new(RwLock::new(None)),
+    };
+    spawn(controller::main(
+        controller_state.clone(),
+        ControllerArg {
+            patterns: patterns.clone(),
+            tracks: tracks.clone(),
+            cmd_rx: controller_cmd_rx,
+            tick_rx: tick_rx.clone(),
+        },
+    ));
+
+    // LYN: Spawn Communicator
     let (communicator_cmd_tx, communicator_cmd_rx) = mpsc::channel(32);
-    spawn(communicator::main(CommunicatorState {
-        patterns: patterns.clone(),
-        tracks: tracks.clone(),
+    let communicator_state = CommunicatorState {
         target_addr: Arc::new(AsyncRwLock::new(DEFAULT_TARGET_ADDR.to_string())),
-        context: None,
-        cmd_rx: communicator_cmd_rx,
-        tick_rx,
-    }));
+    };
+    spawn(communicator::main(
+        communicator_state.clone(),
+        CommunicatorArg {
+            cmd_rx: communicator_cmd_rx,
+        },
+    ));
 
     // LYN: Construct App State
-    let (client_cmd_que, _) = broadcast::channel::<ClientCommand>(64);
-    AppState {
+    let (client_cmd_broadcast, _) = broadcast::channel::<ClientCommand>(64);
+    HandlerState {
         name: Arc::new(RwLock::new(DEFAULT_NAME.to_string())),
         patterns,
         tracks,
+        tick_rx,
         ticker_cmd_tx,
+        controller_cmd_tx,
         communicator_cmd_tx,
-        client_cmd_que,
+        client_cmd_broadcast,
+        ticker_state,
+        controller_state,
+        communicator_state,
     }
 }

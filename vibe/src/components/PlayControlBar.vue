@@ -7,9 +7,9 @@
       variant="outlined"
     >
       <template #icon>
-        <span class="material-symbols-rounded">{{
-          statusButtonStyle.icon
-        }}</span>
+        <span class="material-symbols-rounded">
+          {{ statusButtonStyle.icon }}
+        </span>
       </template>
     </Button>
 
@@ -17,14 +17,18 @@
     <Popover ref="statusPopover">
       <Message
         class="mt-1"
-        :severity="vibedConnected ? 'success' : 'error'"
+        :severity="connected ? 'success' : 'error'"
         variant="outlined"
       >
         <template #icon>
           <span class="material-symbols-rounded">dns</span>
         </template>
-        {{ vibedConnected ? "Connected" : "Disconnected" }}
-        to <span class="font-mono">vibed</span> server
+        {{ connected ? "Connected to" : "Disconnected from" }}
+        <span class="font-mono">vibed</span> server
+        <span v-if="connected">
+          at
+          <span class="font-mono underline">{{ wsAddr }}</span>
+        </span>
       </Message>
     </Popover>
 
@@ -33,17 +37,30 @@
       <FloatLabel variant="on">
         <InputNumber
           id="bpm"
+          :disabled="bpm == null"
           v-model="bpm"
           showButtons
           fluid
-          @update:model-value="setBpm()"
+          @update:model-value="
+            send({
+              action: 'TickerSetBpm',
+              payload: { bpm: bpm! },
+            })
+          "
         />
         <label for="bpm">BPM</label>
       </FloatLabel>
     </span>
 
     <!-- LYN: Puase / Play -->
-    <Button @click="playing ? pause() : play()">
+    <Button
+      :disabled="playing == null"
+      @click="
+        playing
+          ? send({ action: 'TickerPause' })
+          : send({ action: 'TickerPlay' })
+      "
+    >
       <template #icon>
         <span class="material-symbols-rounded">
           {{ playing ? "pause" : "play_arrow" }}
@@ -52,7 +69,7 @@
     </Button>
 
     <!-- LYN: Stop -->
-    <Button @click="stop">
+    <Button :disabled="playing == null" @click="send({ action: 'TickerStop' })">
       <template #icon>
         <span class="material-symbols-rounded">stop</span>
       </template>
@@ -80,34 +97,46 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref } from "vue";
-import { UseVibedReturn } from "../composables/useVibed";
+import { computed, inject, ref, watch } from "vue";
+import { Vibed } from "../App.vue";
+import { set } from "@vueuse/core";
 
-const bpm = ref(120);
-const playing = ref(false);
+// LYN: Vibed Communication
+const { connected, wsAddr, cmd, send } = inject<Vibed>("vibed")!;
+watch(cmd, (cmd) => {
+  switch (cmd!.action) {
+    case "TickerPlaying":
+      set(playing, true);
+      break;
+    case "TickerPaused":
+      set(playing, false);
+      break;
+    case "TickerStopped":
+      set(playing, false);
+      break;
+    case "TickerBpmUpdated":
+      set(bpm, cmd.payload.bpm);
+      break;
+    case "ResponseTickerBpm":
+      set(bpm, cmd.payload.bpm);
+      break;
+    case "ResponseTickerPlaying":
+      set(playing, cmd.payload.playing);
+      break;
+  }
+});
+watch(connected, async (connected) => {
+  if (connected) {
+    send({ action: "RequestTickerBpm" });
+    send({ action: "RequestTickerPlaying" });
+  } else {
+    bpm.value = undefined;
+    playing.value = undefined;
+  }
+});
 
-const { connected: vibedConnected, command } = inject(
-  "vibed",
-) as UseVibedReturn;
-
-function play() {
-  playing.value = true;
-  command({ action: "TickerPlay" });
-}
-function pause() {
-  playing.value = false;
-  command({ action: "TickerPause" });
-}
-function stop() {
-  playing.value = false;
-  command({ action: "TickerStop" });
-}
-function setBpm() {
-  command({
-    action: "TickerSetBpm",
-    payload: { bpm: bpm.value },
-  });
-}
+const bpm = ref<number>();
+const playing = ref<boolean>();
 
 // LYN: Status Popover
 const statusPopover = ref();
@@ -116,7 +145,7 @@ function toggleStatusPopover(event: MouseEvent) {
 }
 
 const statusButtonStyle = computed(() => {
-  if (vibedConnected.value) {
+  if (connected.value) {
     return { icon: "wifi_tethering", severity: "success" };
     return { icon: "wifi_tethering_error", severity: "warn" };
   } else {

@@ -8,7 +8,6 @@ pub struct MinOscMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
 pub enum MinOscArg {
     Float(f32),
     String(String),

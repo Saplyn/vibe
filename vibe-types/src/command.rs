@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
-use crate::state::{Pattern, Track};
+use crate::models::{Pattern, Track};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action", content = "payload")]
@@ -8,7 +10,8 @@ pub enum ServerCommand {
     SetProjectName { name: String },
 
     CommChangeAddr { addr: String },
-    CommChangeContext { context: Option<String> },
+
+    CtrlChangeContext { context: Option<String> },
 
     TrackAdd { name: String },
     TrackDelete { name: String },
@@ -23,15 +26,15 @@ pub enum ServerCommand {
     TickerPause,
     TickerStop,
 
-    RequstProjectName,
+    RequestProjectName,
     RequestCommAddr,
+    RequestCtrlContext,
     RequestTrack { name: String },
     RequestAllTracks,
     RequestPattern { name: String },
     RequestAllPatterns,
-    RequstTickerBpm,
-    RequestTickerCycle,
-    RequestTickerState,
+    RequestTickerBpm,
+    RequestTickerPlaying,
     RequestTickerTick,
 }
 
@@ -41,7 +44,8 @@ pub enum ClientCommand {
     ProjectNameUpdated { name: String },
 
     CommAddrChanged { addr: String },
-    CommContextChanged { context: Option<String> },
+
+    CtrlContextChanged { context: Option<String> },
 
     TrackAdded { name: String, track: Track },
     TrackDeleted { name: String },
@@ -52,19 +56,19 @@ pub enum ClientCommand {
     PatternEdited { name: String, pattern: Pattern },
 
     TickerBpmUpdated { bpm: f32 },
-    TickerTick { index: usize },
+    TickerTick { tick: u8 },
     TickerPlaying,
     TickerPaused,
     TickerStopped,
 
-    ResponseProjectName { string: String },
-    ResponseCommAddr { string: String },
+    ResponseProjectName { name: String },
+    ResponseCommAddr { addr: String },
+    ResponseCtrlContext { context: Option<String> },
     ResponseTrack { name: String, track: Track },
-    ResponseAllTracks { tracks: Vec<(String, Track)> },
+    ResponseAllTracks { tracks: HashMap<String, Track> },
     ResponsePattern { name: String, pattern: Pattern },
-    ResponseAllPatterns { patterns: Vec<(String, Pattern)> },
+    ResponseAllPatterns { patterns: HashMap<String, Pattern> },
     ResponseTickerBpm { bpm: f32 },
-    ResponseTickerCycle { cycle: Option<usize> },
-    ResponseTickerState { playing: bool },
-    ResponseTickerTick { index: usize },
+    ResponseTickerPlaying { playing: bool },
+    ResponseTickerTick { tick: u8 },
 }

@@ -1,27 +1,6 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc};
 
-use crate::command::ClientCommand;
-use crate::communicator::CommunicatorCommand;
 use crate::mosc::MinOscMessage;
-use crate::ticker::TickerCommand;
-
-// LYN: App State
-
-#[derive(Debug, Clone)]
-pub struct AppState {
-    pub name: Arc<RwLock<String>>,
-
-    pub patterns: Arc<RwLock<HashMap<String, Pattern>>>,
-    pub tracks: Arc<RwLock<HashMap<String, Track>>>,
-
-    pub ticker_cmd_tx: mpsc::Sender<TickerCommand>,
-    pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
-    pub client_cmd_que: broadcast::Sender<ClientCommand>,
-}
 
 // LYN: Pattern
 

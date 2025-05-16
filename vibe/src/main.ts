@@ -11,7 +11,6 @@ import "material-symbols";
 
 import router from "./router";
 import { createPinia } from "pinia";
-import { useVibed } from "./composables/useVibed";
 
 const preset = definePreset(Aura, {
   semantic: {
@@ -44,6 +43,5 @@ createApp(App)
     },
   })
   .use(router)
-  .provide("vibed", useVibed())
   .use(createPinia())
   .mount("#app");

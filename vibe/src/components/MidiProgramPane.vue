@@ -108,8 +108,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ComputedRef, Ref, ref } from "vue";
-import { Page, Pattern } from "../types/models";
+import { computed, ref } from "vue";
+import { Page } from "../types/models";
 import { get } from "@vueuse/core";
 
 const codes = defineModel<Page<number | null>[]>("codes");

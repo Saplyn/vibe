@@ -40,7 +40,7 @@
       <div v-for="(_, pageOffset) in 4" class="flex grow">
         <!-- Valid -->
         <div
-          v-if="startingPage! + pageOffset < pageCount!"
+          v-if="startingPage + pageOffset < pageCount"
           v-for="(_, index) in 4"
           class="flex grow flex-col"
         >
@@ -55,12 +55,12 @@
             {{ noteAbove(pageOffset, index) }}
           </div>
           <SelectButton
-            v-model="codes![startingPage! + pageOffset][index]"
+            v-model="codes![startingPage + pageOffset][index]"
             :options="midiOpts"
             class="grow flex-col"
             :pt:pcToggleButton:root:class="
               'rounded-none font-mono grow flex items-center justify-center ' +
-              ((startingPage! + pageOffset) % 2 === 0
+              ((startingPage + pageOffset) % 2 === 0
                 ? 'dark:bg-surface-900 bg-surface-200'
                 : 'dark:border-surface-900 border-surface-200')
             "
@@ -92,13 +92,7 @@
             :options="placeholderOpts"
             class="grow flex-col"
             pt:pcToggleButton:root:class="rounded-none font-mono grow flex items-center justify-center"
-            :pt:pcToggleButton:content="
-              (opt: any) => ({
-                class: opt.context.active
-                  ? 'h-full bg-primary text-primary-contrast font-bold'
-                  : 'h-full',
-              })
-            "
+            pt:pcToggleButton:content="h-full"
           />
           <div class="h-8 shrink-0">{{ noteBelow() }}</div>
         </div>
@@ -113,8 +107,10 @@ import { Page } from "../types/models";
 import { get } from "@vueuse/core";
 
 const codes = defineModel<Page<number | null>[]>("codes");
-const pageCount = defineModel<number>("page-count");
-const startingPage = defineModel<number>("starting-page");
+const props = defineProps<{
+  startingPage: number;
+  pageCount: number;
+}>();
 
 const octave = ref<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(5);
 const midiOpts = computed(() =>
@@ -125,7 +121,7 @@ const placeholderOpts = Array(12).fill("--");
 // LYN: Note Key Styling
 function noteAbove(offset?: number, index?: number): number | undefined {
   if (offset != undefined && index != undefined) {
-    let note = get(codes)![get(startingPage)! + offset][index];
+    let note = get(codes)![props.startingPage! + offset][index];
     if (note != undefined && note >= (get(octave) + 1) * 12) {
       return note;
     }
@@ -134,7 +130,7 @@ function noteAbove(offset?: number, index?: number): number | undefined {
 }
 function noteBelow(offset?: number, index?: number): number | undefined {
   if (offset != undefined && index != undefined) {
-    let note = get(codes)![get(startingPage)! + offset][index];
+    let note = get(codes)![props.startingPage! + offset][index];
     if (note != undefined && note < get(octave) * 12) {
       return note;
     }

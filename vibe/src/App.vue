@@ -191,7 +191,8 @@ provide<TrackState>("track-state", {
 
 // LYN: Pattern Editing
 const patternName = ref<string>();
-const changeEditing = (name?: string) => set(patternName, name);
+const changeEditing = (name: string | null) =>
+  set(patternName, name ?? undefined);
 watch(patterns, (patterns) => {
   let name = get(patternName);
   if (name != undefined && patterns?.[name] == undefined) {
@@ -204,7 +205,7 @@ export type PatternEditing = {
   name: DeepReadonly<
     UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
   >;
-  change: (name?: string) => void;
+  change: (name: string | null) => void;
 };
 provide<PatternEditing>("pattern-editing", {
   name: readonly(patternName),

@@ -32,7 +32,7 @@ impl Pattern {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Messages {
     pub payload: MinOscMessage,
-    pub active: Vec<Page<bool>>,
+    pub actives: Vec<Page<bool>>,
 }
 
 impl Pattern {
@@ -44,7 +44,7 @@ impl Pattern {
         self.midi_codes.resize(page_count, [None, None, None, None]);
         for message in &mut self.messages {
             message
-                .active
+                .actives
                 .resize(page_count, [false, false, false, false]);
         }
     }
@@ -60,11 +60,11 @@ impl Pattern {
         if let Some(midi_code) = self.midi_codes[page][index] {
             ret.push(MinOscMessage {
                 path: self.midi_path.to_owned(),
-                args: vec![MinOscArg::Float(midi_code as f32)],
+                arg: MinOscArg::Float(midi_code as f32),
             });
         }
         for message in &self.messages {
-            if message.active[page][index] {
+            if message.actives[page][index] {
                 ret.push(message.payload.to_owned());
             }
         }

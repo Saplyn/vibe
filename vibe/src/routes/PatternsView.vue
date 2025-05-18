@@ -121,26 +121,15 @@
 
           <Divider layout="vertical" />
 
-          <!-- LYN: Midi Path -->
-          <span class="h-10">
-            <FloatLabel variant="on">
-              <InputText
-                id="midi-path"
-                fluid
-                v-if="!notEditing"
-                v-model="patternEditing!.midi_path"
-              />
-              <InputNumber v-else id="midi-path" fluid disabled />
-              <label for="page-count">Midi Path</label>
-            </FloatLabel>
-          </span>
-
-          <Divider layout="vertical" />
-
           <!-- LYN: Edit Control -->
           <Button
-            :disabled="!dirty"
-            :variant="editingName != undefined && dirty ? '' : 'outlined'"
+            :disabled="!dirty || !validMessages"
+            :variant="
+              editingName != undefined && dirty && validMessages
+                ? ''
+                : 'outlined'
+            "
+            :severity="validMessages ? '' : 'danger'"
             label="Make Edit"
             @click="makeEdit()"
           >
@@ -148,21 +137,65 @@
               <span class="material-symbols-rounded">edit_square</span>
             </template>
           </Button>
+
+          <Divider layout="vertical" />
+
+          <!-- LYN: Midi Path -->
+          <span class="h-10" v-if="visiblePane.value === 'midi'">
+            <InputGroup>
+              <InputGroupAddon>
+                <span class="material-symbols-rounded">lyrics</span>
+              </InputGroupAddon>
+              <FloatLabel variant="on">
+                <InputText
+                  id="midi-path"
+                  fluid
+                  v-if="!notEditing"
+                  v-model="patternEditing!.midi_path"
+                />
+                <InputNumber v-else id="midi-path" fluid disabled />
+                <label for="page-count">Midi Path</label>
+              </FloatLabel>
+            </InputGroup>
+          </span>
+
+          <Button
+            v-if="visiblePane.value === 'message'"
+            @click="addNewMessage"
+            :disabled="notEditing"
+            label="New Message"
+          >
+            <template #icon>
+              <span class="material-symbols-rounded">add_comment</span>
+            </template>
+          </Button>
         </div>
 
         <!-- LYN: Programming Pane -->
-        <div v-if="notEditing">select a pattern to edit</div>
+        <div
+          v-if="notEditing"
+          class="text-primary/50 flex h-full items-center justify-center text-5xl italic"
+        >
+          Select a pattern to edit...
+        </div>
         <div v-else class="flex h-full flex-col">
           <!-- LYN: Midi Programming -->
           <MidiProgramPane
             v-if="visiblePane.value === 'midi'"
             v-model:codes="patternEditing!.midi_codes"
-            v-model:page-count="patternEditing!.page_count"
-            v-model:starting-page="startingPage"
+            :page-count="patternEditing!.page_count"
+            :starting-page="startingPage"
           />
 
           <!-- LYN: Message Programming -->
-          <MessageProgramPane v-if="visiblePane.value === 'message'" />
+          <MessageProgramPane
+            v-if="visiblePane.value === 'message'"
+            v-model:messages="patternEditing!.messages"
+            v-model:valid="validMessages"
+            :codes="patternEditing!.midi_codes"
+            :page-count="patternEditing!.page_count"
+            :starting-page="startingPage"
+          />
         </div>
       </div>
     </BlockUI>
@@ -219,6 +252,8 @@ watch(
   (pattern) => {
     if (pattern != undefined) {
       set(patternOriginal, JSON.parse(JSON.stringify(pattern)));
+    } else {
+      set(patternOriginal, undefined);
     }
   },
 );
@@ -254,6 +289,7 @@ function confirmDelPattern(event: MouseEvent, name: string) {
 }
 
 // LYN: Make Page Edit
+const validMessages = ref(true);
 function makeEdit() {
   if (!get(notEditing)) {
     editPattern(get(editingName)!, get(patternEditing)!);
@@ -272,6 +308,16 @@ watch(
         }
       } else if (midi_codes.length > count) {
         midi_codes.splice(count);
+      }
+
+      for (let msg of get(patternEditing)!.messages) {
+        if (msg.actives.length < count) {
+          for (let i = msg.actives.length; i < count; i++) {
+            msg.actives.push([false, false, false, false]);
+          }
+        } else if (msg.actives.length > count) {
+          msg.actives.splice(count);
+        }
       }
     }
   },
@@ -292,5 +338,25 @@ watch(
 const patternNameToAdd = ref<string>("");
 function addPatternWrapper() {
   addPattern(get(patternNameToAdd));
+}
+
+// LYN: Add New Message
+function addNewMessage() {
+  let pat = get(patternEditing)!;
+  pat.messages.push({
+    actives: Array.from({ length: pat.page_count }, () => [
+      false,
+      false,
+      false,
+      false,
+    ]),
+    payload: {
+      path: "/",
+      arg: {
+        type: "String",
+        value: "",
+      },
+    },
+  });
 }
 </script>

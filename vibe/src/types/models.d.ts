@@ -10,7 +10,7 @@ export type Pattern = {
 
 export type Messages = {
   payload: MinOscMessage;
-  active: Page<boolean>[];
+  actives: Page<boolean>[];
 };
 
 export type Track = {
@@ -21,7 +21,7 @@ export type Track = {
 
 export type MinOscMessage = {
   path: string;
-  args: MinOscArg[];
+  arg: MinOscArg;
 };
 
 type MinOscArg =

@@ -159,7 +159,8 @@ const statusButtonStyle = computed(() => {
 });
 
 // LYN: Context
-const { name } = inject<PatternEditing>("pattern-editing")!;
+const { name, change: changeEditing } =
+  inject<PatternEditing>("pattern-editing")!;
 const currContext = ref<{ value: string }>({ value: "track" });
 const contexts = [
   {
@@ -180,16 +181,19 @@ watch(name, (name) => {
     set(currContext, { value: "track" });
   }
 });
-watch(currContext, (ctx) => {
-  switch (ctx.value) {
-    case "track":
-      send({ action: "CtrlChangeContext", payload: { context: null } });
-      break;
-    case "pattern":
-      send({ action: "CtrlChangeContext", payload: { context: get(name)! } });
-      break;
-  }
-});
+watch(
+  () => get(currContext).value,
+  (ctx) => {
+    switch (ctx) {
+      case "track":
+        send({ action: "CtrlChangeContext", payload: { context: null } });
+        break;
+      case "pattern":
+        send({ action: "CtrlChangeContext", payload: { context: get(name)! } });
+        break;
+    }
+  },
+);
 
 // LYN: Target Comm
 const { addr: commAddr, established } = inject<CommInfo>("comm-info")!;
@@ -224,6 +228,14 @@ watch([cmd, watchableResp], ([cmd, _]) => {
     case "TickerTick":
       set(tick, cmd.payload.tick);
       set(max, cmd.payload.max);
+      break;
+    case "CtrlContextChanged":
+      set(currContext, {
+        value: cmd.payload.context == null ? "track" : "pattern",
+      });
+      if (cmd.payload.context != null) {
+        changeEditing(cmd.payload.context);
+      }
       break;
   }
 });

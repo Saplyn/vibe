@@ -79,7 +79,7 @@ pub async fn main(state: CommunicatorState, arg: CommunicatorArg) {
 }
 
 // HACK: It seems that making tcp connection isn't canceal safe to be used in inside `select!`,
-// thus must be wrapped inside a spawn
+// thus must be wrapped inside a `tokio::spawn()`
 fn spawn_connect(addr: String) -> JoinHandle<io::Result<TcpStream>> {
     spawn(async move { TcpStream::connect(addr).await })
 }
@@ -94,6 +94,7 @@ async fn process(
                 match cmd {
                     CommunicatorCommand::ChangeTargetAddr { addr } => break Some(addr),
                     CommunicatorCommand::SendMessage { msg } => {
+                        // FIXME: handle invalid osc message error
                         let packat = encode(&OscPacket::Message(msg.into())).unwrap();
                         let packet: String = packat
                             .iter()

@@ -47,13 +47,12 @@ export type ClientCommand =
   | { action: "TickerPlaying" }
   | { action: "TickerPaused" }
   | { action: "TickerStopped" }
-  | { action: "TickerTick"; payload: { tick: number } }
+  | { action: "TickerTick"; payload: { tick: number; max: usize } }
   | { action: "TickerBpmUpdated"; payload: { bpm: number } }
-  | { action: "TickerCycleUpdated"; payload: { cycle: number | null } }
   // LYN: Response
   | { action: "ResponseTickerBpm"; payload: { bpm: number } }
   | { action: "ResponseTickerPlaying"; payload: { playing: boolean } }
-  | { action: "ResponseTickerTick"; payload: { tick: number } }
+  | { action: "ResponseTickerTick"; payload: { tick: number; max: usize } }
   | { action: "ResponseProjectName"; payload: { name: string } }
   | { action: "ResponseCommAddr"; payload: { addr: string } }
   | { action: "ResponseCommStatus"; payload: { established: boolean } }

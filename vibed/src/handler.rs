@@ -20,7 +20,7 @@ use vibe_types::{
 use crate::{
     communicator::{CommunicatorCommand, CommunicatorState},
     controller::{ControllerCommand, ControllerState},
-    ticker::{TickerCommand, TickerState},
+    ticker::{self, TickerCommand, TickerState},
 };
 
 #[derive(Debug, Clone)]
@@ -30,12 +30,11 @@ pub struct HandlerState {
     pub patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
     pub tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
 
-    pub tick_rx: watch::Receiver<Option<usize>>,
+    pub tick_rx: watch::Receiver<(Option<usize>, usize)>,
     pub connection_status_rx: watch::Receiver<bool>,
 
     pub ticker_cmd_tx: mpsc::Sender<TickerCommand>,
     pub controller_cmd_tx: mpsc::Sender<ControllerCommand>,
-    pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
     pub client_cmd_broadcast: broadcast::Sender<ClientCommand>,
 
     pub ticker_state: TickerState,
@@ -62,7 +61,6 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
         mut connection_status_rx,
         ticker_cmd_tx,
         controller_cmd_tx,
-        communicator_cmd_tx,
         client_cmd_broadcast,
         ticker_state,
         controller_state,
@@ -87,8 +85,10 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                                 socket: &mut socket,
                                 name: name.clone(),
                                 patterns: patterns.clone(),
+                                tick_rx: &tick_rx,
                                 tracks: tracks.clone(),
                                 ticker_cmd_tx: &ticker_cmd_tx,
+                                controller_cmd_tx: &controller_cmd_tx,
                                 client_cmd_broadcast_tx: &client_cmd_broadcast_tx,
                                 ticker_state: &ticker_state,
                                 controller_state: &controller_state,
@@ -107,8 +107,8 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
             }
             Ok(()) = tick_rx.changed() => {
                 let maybe_tick = *tick_rx.borrow_and_update();
-                if let Some(tick) = maybe_tick {
-                    respond(&mut socket, ClientCommand::TickerTick { tick }).await.unwrap();
+                if let (Some(tick), max) = maybe_tick {
+                    respond(&mut socket, ClientCommand::TickerTick { tick, max }).await.unwrap();
                 }
             }
             Ok(()) = connection_status_rx.changed() => {
@@ -137,7 +137,9 @@ pub struct ProcessArg<'a> {
     patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
     tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
     socket: &'a mut WebSocket,
+    tick_rx: &'a watch::Receiver<(Option<usize>, usize)>,
     ticker_cmd_tx: &'a mpsc::Sender<TickerCommand>,
+    pub controller_cmd_tx: &'a mpsc::Sender<ControllerCommand>,
     client_cmd_broadcast_tx: &'a broadcast::Sender<ClientCommand>,
     ticker_state: &'a TickerState,
     controller_state: &'a ControllerState,
@@ -151,7 +153,9 @@ async fn process(arg: ProcessArg<'_>) {
         patterns,
         tracks,
         socket,
+        tick_rx,
         ticker_cmd_tx,
+        controller_cmd_tx,
         client_cmd_broadcast_tx,
         ticker_state,
         controller_state,
@@ -159,37 +163,73 @@ async fn process(arg: ProcessArg<'_>) {
     } = arg;
 
     match cmd {
+        // LYN: Misc
+        ServerCommand::CtrlChangeContext { context } => {
+            if let Some(context) = context {
+                // Context: pattern
+                let cycle = patterns
+                    .read()
+                    .await
+                    .get(&context)
+                    .map(|pat| pat.page_count);
+                if cycle.is_some() {
+                    controller_cmd_tx
+                        .send(ControllerCommand::ChangeContext {
+                            context: Some(context.clone()),
+                        })
+                        .await
+                        .unwrap();
+                    client_cmd_broadcast_tx
+                        .send(ClientCommand::CtrlContextChanged {
+                            context: Some(context),
+                        })
+                        .unwrap();
+                } else {
+                    // non-exist pattern
+                    respond(
+                        socket,
+                        ClientCommand::Notify {
+                            severity: Severity::Error,
+                            summary: "Failed to Change Context".to_string(),
+                            detail: format!("Pattern with name \"{}\" does not exist", context),
+                        },
+                    )
+                    .await
+                    .unwrap();
+                }
+            } else {
+                // Context: track
+                controller_cmd_tx
+                    .send(ControllerCommand::ChangeContext { context: None })
+                    .await
+                    .unwrap();
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::CtrlContextChanged { context: None })
+                    .unwrap();
+            }
+        }
         // LYN: Ticker
         ServerCommand::TickerPlay => {
-            ticker_cmd_tx
-                .send(crate::ticker::TickerCommand::Play)
-                .await
-                .unwrap();
+            ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
             client_cmd_broadcast_tx
                 .send(ClientCommand::TickerPlaying)
                 .unwrap();
         }
         ServerCommand::TickerPause => {
-            ticker_cmd_tx
-                .send(crate::ticker::TickerCommand::Pause)
-                .await
-                .unwrap();
+            ticker_cmd_tx.send(TickerCommand::Pause).await.unwrap();
             client_cmd_broadcast_tx
                 .send(ClientCommand::TickerPaused)
                 .unwrap();
         }
         ServerCommand::TickerStop => {
-            ticker_cmd_tx
-                .send(crate::ticker::TickerCommand::Stop)
-                .await
-                .unwrap();
+            ticker_cmd_tx.send(TickerCommand::Stop).await.unwrap();
             client_cmd_broadcast_tx
                 .send(ClientCommand::TickerStopped)
                 .unwrap();
         }
         ServerCommand::TickerSetBpm { bpm } => {
             ticker_cmd_tx
-                .send(crate::ticker::TickerCommand::SetBPM { bpm })
+                .send(TickerCommand::SetBPM { bpm })
                 .await
                 .unwrap();
             client_cmd_broadcast_tx
@@ -279,15 +319,12 @@ async fn process(arg: ProcessArg<'_>) {
             .unwrap();
         }
         ServerCommand::RequestTickerTick => {
+            let (tick, max) = *tick_rx.borrow();
             respond(
                 socket,
                 ClientCommand::ResponseTickerTick {
-                    tick: ticker_state
-                        .tick
-                        .read()
-                        .await
-                        .map(|val| val as isize)
-                        .unwrap_or(-1),
+                    tick: tick.map(|val| val as isize).unwrap_or(-1),
+                    max,
                 },
             )
             .await
@@ -343,8 +380,8 @@ async fn process(arg: ProcessArg<'_>) {
             .await
             .unwrap();
         }
-        _ => {
-            todo!()
+        cmd => {
+            todo!("not impled: {:?}", cmd)
         }
     }
 }

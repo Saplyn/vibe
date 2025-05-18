@@ -112,55 +112,6 @@ onMounted(async () => {
   });
 });
 
-// LYN: Pattern Editing
-const patternName = ref<string>();
-const changeEditing = (name?: string) => set(patternName, name);
-
-// LYN: Pattern Editing (provide)
-export type PatternEditing = {
-  name: DeepReadonly<
-    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
-  >;
-  change: (name?: string) => void;
-};
-provide<PatternEditing>("pattern-editing", {
-  name: readonly(patternName),
-  change: changeEditing,
-});
-
-// LYN: Project Info
-const projectName = ref<string>();
-const changeProjectName = (name: string) => set(projectName, name);
-export type ProjectInfo = {
-  name: DeepReadonly<
-    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
-  >;
-  change: (name: string) => void;
-};
-provide<ProjectInfo>("project-info", {
-  name: readonly(projectName),
-  change: changeProjectName,
-});
-
-// LYN: Target Address
-const commAddr = ref<string>();
-const established = ref<boolean>();
-const changeCommAddr = (name: string) => set(commAddr, name);
-export type CommInfo = {
-  addr: DeepReadonly<
-    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
-  >;
-  established: DeepReadonly<
-    UnwrapNestedRefs<Ref<boolean | undefined, boolean | undefined>>
-  >;
-  change: (name: string) => void;
-};
-provide<CommInfo>("comm-info", {
-  addr: readonly(commAddr),
-  established: readonly(established),
-  change: changeCommAddr,
-});
-
 // LYN: Patterns
 const patterns = ref<Record<string, Pattern>>();
 const addPattern = (name: string) =>
@@ -236,6 +187,61 @@ provide<TrackState>("track-state", {
   addTrack,
   delTrack,
   editTrack,
+});
+
+// LYN: Pattern Editing
+const patternName = ref<string>();
+const changeEditing = (name?: string) => set(patternName, name);
+watch(patterns, (patterns) => {
+  let name = get(patternName);
+  if (name != undefined && patterns?.[name] == undefined) {
+    set(patternName, undefined);
+  }
+});
+
+// LYN: Pattern Editing (provide)
+export type PatternEditing = {
+  name: DeepReadonly<
+    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
+  >;
+  change: (name?: string) => void;
+};
+provide<PatternEditing>("pattern-editing", {
+  name: readonly(patternName),
+  change: changeEditing,
+});
+
+// LYN: Project Info
+const projectName = ref<string>();
+const changeProjectName = (name: string) => set(projectName, name);
+export type ProjectInfo = {
+  name: DeepReadonly<
+    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
+  >;
+  change: (name: string) => void;
+};
+provide<ProjectInfo>("project-info", {
+  name: readonly(projectName),
+  change: changeProjectName,
+});
+
+// LYN: Target Address
+const commAddr = ref<string>();
+const established = ref<boolean>();
+const changeCommAddr = (name: string) => set(commAddr, name);
+export type CommInfo = {
+  addr: DeepReadonly<
+    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
+  >;
+  established: DeepReadonly<
+    UnwrapNestedRefs<Ref<boolean | undefined, boolean | undefined>>
+  >;
+  change: (name: string) => void;
+};
+provide<CommInfo>("comm-info", {
+  addr: readonly(commAddr),
+  established: readonly(established),
+  change: changeCommAddr,
 });
 
 // LYN: Data Fetching

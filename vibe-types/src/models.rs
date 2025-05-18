@@ -50,7 +50,11 @@ impl Pattern {
     }
     pub fn get_osc_messages(&self, tick: usize) -> Vec<MinOscMessage> {
         let (page, index) = (tick / 4, tick % 4);
-        assert!(page < self.page_count);
+        assert!(
+            page <= self.page_count,
+            "page {page} <= count {}",
+            self.page_count
+        );
 
         let mut ret = Vec::new();
         if let Some(midi_code) = self.midi_codes[page][index] {

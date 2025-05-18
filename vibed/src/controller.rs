@@ -8,6 +8,8 @@ use tracing::{info, trace, warn};
 
 use vibe_types::models::{Pattern, Track};
 
+use crate::communicator::CommunicatorCommand;
+
 #[derive(Debug, Clone)]
 pub struct ControllerState {
     pub context: Arc<AsyncRwLock<Option<String>>>, // pattern name, empty for tracks
@@ -18,7 +20,8 @@ pub struct ControllerArg {
     pub patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
     pub tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
     pub cmd_rx: mpsc::Receiver<ControllerCommand>,
-    pub tick_rx: watch::Receiver<Option<usize>>,
+    pub tick_rx: watch::Receiver<(Option<usize>, usize)>,
+    pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
 }
 
 #[derive(Debug)]
@@ -35,6 +38,7 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
         tracks,
         mut cmd_rx,
         mut tick_rx,
+        communicator_cmd_tx,
     } = arg;
 
     loop {
@@ -47,7 +51,7 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                 }
             }
             Ok(()) = tick_rx.changed() => {
-                let Some(tick) = *tick_rx.borrow_and_update() else {
+                let (Some(tick), _) = *tick_rx.borrow_and_update() else {
                     continue;
                 };
 
@@ -57,7 +61,11 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                         warn!("Pattern {} not found", pattern_name);
                         continue;
                     };
-                    pattern.get_osc_messages(tick);
+                    for msg in pattern.get_osc_messages(tick) {
+                        communicator_cmd_tx.send(CommunicatorCommand::SendMessage { msg })
+                            .await
+                            .unwrap();
+                    }
                 } else {
                     trace!("Controller track play not impled")
                 }

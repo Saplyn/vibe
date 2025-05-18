@@ -49,8 +49,8 @@
             <span class="font-mono underline">{{ commAddr }}</span>
           </span>
           <span v-else>
-            <span class="font-mono">vibed</span> host TCP connection status
-            unavailable
+            <span class="font-mono">vibed</span>
+            host TCP connection status unavailable
           </span>
         </Message>
       </div>
@@ -120,7 +120,7 @@
     </SelectButton>
 
     <ProgressBar
-      :value="((tick + 1) / 16) * 100"
+      :value="((tick + 1) / (max + 1)) * 100"
       class="h-full grow"
       :pt:value:class="
         'duration-[0ms] ' +
@@ -143,6 +143,7 @@ import { get, set } from "@vueuse/core";
 const bpm = ref<number>();
 const playing = ref<boolean>();
 const tick = ref<number>(-1);
+const max = ref<number>(-1);
 
 // LYN: Status Popover
 const statusPopover = ref();
@@ -179,6 +180,16 @@ watch(name, (name) => {
     set(currContext, { value: "track" });
   }
 });
+watch(currContext, (ctx) => {
+  switch (ctx.value) {
+    case "track":
+      send({ action: "CtrlChangeContext", payload: { context: null } });
+      break;
+    case "pattern":
+      send({ action: "CtrlChangeContext", payload: { context: get(name)! } });
+      break;
+  }
+});
 
 // LYN: Target Comm
 const { addr: commAddr, established } = inject<CommInfo>("comm-info")!;
@@ -208,9 +219,11 @@ watch([cmd, watchableResp], ([cmd, _]) => {
       break;
     case "ResponseTickerTick":
       set(tick, cmd.payload.tick);
+      set(max, cmd.payload.max);
       break;
     case "TickerTick":
       set(tick, cmd.payload.tick);
+      set(max, cmd.payload.max);
       break;
   }
 });

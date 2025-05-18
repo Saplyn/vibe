@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{Pattern, Track};
 
+#[rustfmt::skip]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action", content = "payload")]
 pub enum ServerCommand {
@@ -11,7 +12,7 @@ pub enum ServerCommand {
 
     CommChangeAddr { addr: String },
 
-    CtrlChangeContext { context: Option<String> },
+    CtrlChangeContext { context: Option<String> }, // ~> TickerSetCycle { cycle: Option<usize> },
 
     TrackAdd { name: String },
     TrackDelete { name: String },
@@ -21,29 +22,32 @@ pub enum ServerCommand {
     PatternDelete { name: String },
     PatternEdit { name: String, pattern: Pattern },
 
-    TickerSetBpm { bpm: f32 },
     TickerPlay,
     TickerPause,
     TickerStop,
+    TickerSetBpm { bpm: f32 },
 
+    RequestTickerBpm,
+    RequestTickerPlaying,
+    RequestTickerTick,
     RequestProjectName,
     RequestCommAddr,
+    RequestCommStatus,
     RequestCtrlContext,
     RequestTrack { name: String },
     RequestAllTracks,
     RequestPattern { name: String },
     RequestAllPatterns,
-    RequestTickerBpm,
-    RequestTickerPlaying,
-    RequestTickerTick,
 }
 
+#[rustfmt::skip]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action", content = "payload")]
 pub enum ClientCommand {
     ProjectNameUpdated { name: String },
 
     CommAddrChanged { addr: String },
+    CommStatusChanged { established: bool },
 
     CtrlContextChanged { context: Option<String> },
 
@@ -55,20 +59,35 @@ pub enum ClientCommand {
     PatternDeleted { name: String },
     PatternEdited { name: String, pattern: Pattern },
 
-    TickerBpmUpdated { bpm: f32 },
-    TickerTick { tick: u8 },
     TickerPlaying,
     TickerPaused,
     TickerStopped,
+    TickerTick { tick: usize },
+    TickerBpmUpdated { bpm: f32 },
+    TickerCycleUpdated { cycle: Option<usize> },
 
+    ResponseTickerBpm { bpm: f32 },
+    ResponseTickerPlaying { playing: bool },
+    ResponseTickerTick { tick: isize },
     ResponseProjectName { name: String },
     ResponseCommAddr { addr: String },
+    ResponseCommStatus { established: bool },
     ResponseCtrlContext { context: Option<String> },
     ResponseTrack { name: String, track: Track },
     ResponseAllTracks { tracks: HashMap<String, Track> },
     ResponsePattern { name: String, pattern: Pattern },
     ResponseAllPatterns { patterns: HashMap<String, Pattern> },
-    ResponseTickerBpm { bpm: f32 },
-    ResponseTickerPlaying { playing: bool },
-    ResponseTickerTick { tick: u8 },
+
+    Notify { severity: Severity, summary: String, detail: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    Success,
+    Info,
+    Warn,
+    Error,
+    Secondary,
+    Contrast,
 }

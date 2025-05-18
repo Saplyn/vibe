@@ -1,7 +1,7 @@
 use rosc::OscMessage;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MinOscMessage {
     pub path: String,
     pub args: Vec<MinOscArg>,

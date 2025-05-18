@@ -4,44 +4,59 @@ export type ServerCommand =
   | { action: "SetProjectName"; payload: { name: string } }
   | { action: "CommChangeAddr"; payload: { addr: string } }
   | { action: "CtrlChangeContext"; payload: { context: string | null } }
+  // LYN: Track
   | { action: "TrackAdd"; payload: { name: string } }
   | { action: "TrackDelete"; payload: { name: string } }
   | { action: "TrackEdit"; payload: { name: string; track: Track } }
+  // LYN: Pattern
   | { action: "PatternAdd"; payload: { name: string } }
   | { action: "PatternDelete"; payload: { name: string } }
   | { action: "PatternEdit"; payload: { name: string; pattern: Pattern } }
-  | { action: "TickerSetBpm"; payload: { bpm: number } }
+  // LYN: Ticker
   | { action: "TickerPlay" }
   | { action: "TickerPause" }
   | { action: "TickerStop" }
+  | { action: "TickerSetBpm"; payload: { bpm: number } }
+  // LYN: Request
+  | { action: "RequestTickerBpm" }
+  | { action: "RequestTickerPlaying" }
+  | { action: "RequestTickerTick" }
   | { action: "RequestProjectName" }
   | { action: "RequestCommAddr" }
+  | { action: "RequestCommStatus" }
   | { action: "RequestCtrlContext" }
   | { action: "RequestTrack"; payload: { name: string } }
   | { action: "RequestAllTracks" }
   | { action: "RequestPattern"; payload: { name: string } }
-  | { action: "RequestAllPatterns" }
-  | { action: "RequestTickerBpm" }
-  | { action: "RequestTickerPlaying" }
-  | { action: "RequestTickerTick" };
+  | { action: "RequestAllPatterns" };
 
 export type ClientCommand =
   | { action: "ProjectNameUpdated"; payload: { name: string } }
   | { action: "CommAddrChanged"; payload: { addr: string } }
+  | { action: "CommStatusChanged"; payload: { established: boolean } }
   | { action: "CtrlContextChanged"; payload: { context: string | null } }
+  // LYN: Track
   | { action: "TrackAdded"; payload: { name: string; track: Track } }
   | { action: "TrackDeleted"; payload: { name: string } }
   | { action: "TrackEdited"; payload: { name: string; track: Track } }
+  // LYN: Pattern
   | { action: "PatternAdded"; payload: { name: string; pattern: Pattern } }
   | { action: "PatternDeleted"; payload: { name: string } }
   | { action: "PatternEdited"; payload: { name: string; pattern: Pattern } }
-  | { action: "TickerBpmUpdated"; payload: { bpm: number } }
-  | { action: "TickerTick"; payload: { tick: number } }
+  // LYN: Ticker
   | { action: "TickerPlaying" }
   | { action: "TickerPaused" }
   | { action: "TickerStopped" }
+  | { action: "TickerTick"; payload: { tick: number } }
+  | { action: "TickerBpmUpdated"; payload: { bpm: number } }
+  | { action: "TickerCycleUpdated"; payload: { cycle: number | null } }
+  // LYN: Response
+  | { action: "ResponseTickerBpm"; payload: { bpm: number } }
+  | { action: "ResponseTickerPlaying"; payload: { playing: boolean } }
+  | { action: "ResponseTickerTick"; payload: { tick: number } }
   | { action: "ResponseProjectName"; payload: { name: string } }
   | { action: "ResponseCommAddr"; payload: { addr: string } }
+  | { action: "ResponseCommStatus"; payload: { established: boolean } }
   | { action: "ResponseCtrlContext"; payload: { context: string | null } }
   | { action: "ResponseTrack"; payload: { name: string; track: Track } }
   | { action: "ResponseAllTracks"; payload: { tracks: Record<string, Track> } }
@@ -50,6 +65,15 @@ export type ClientCommand =
       action: "ResponseAllPatterns";
       payload: { patterns: Record<string, Pattern> };
     }
-  | { action: "ResponseTickerBpm"; payload: { bpm: number } }
-  | { action: "ResponseTickerPlaying"; payload: { playing: boolean } }
-  | { action: "ResponseTickerTick"; payload: { tick: number } };
+  | {
+      action: "Notify";
+      payload: { severity: Severity; summary: string; detail: string };
+    };
+
+export type Severity =
+  | "success"
+  | "info"
+  | "warn"
+  | "error"
+  | "secondary"
+  | "contrast";

@@ -1,14 +1,63 @@
 <template>
   <div class="h-full">
-    <div class="flex h-full w-full">
-      <!-- LYN: Pattern List -->
-      <div class="border-surface w-1/4 max-w-96 min-w-64 shrink-0 border-r-4">
-        pattern list
+    <BlockUI class="flex h-full w-full" :blocked="!connected">
+      <div
+        class="border-surface flex w-1/4 max-w-96 min-w-64 shrink-0 flex-col justify-between border-r-4"
+      >
+        <!-- LYN: Pattern List -->
+        <div class="m-2 flex grow flex-col gap-2 overflow-auto">
+          <ButtonGroup v-for="pattern in patterns">
+            <Button
+              fluid
+              class="justify-between"
+              :pt:label:class="
+                'font-mono ' +
+                (pattern.name === editingName ? 'font-black' : '')
+              "
+              :label="pattern.name"
+              :badge="pattern.page_count.toString()"
+              :badge-severity="
+                pattern.name === editingName ? 'contrast' : 'secondary'
+              "
+              @click="setEditing(pattern.name)"
+              :severity="pattern.name === editingName ? 'primary' : 'secondary'"
+            />
+            <Button
+              @click="confirmDelPattern($event, pattern.name)"
+              :severity="pattern.name === editingName ? 'danger' : 'secondary'"
+              :class="pattern.name === editingName ? '' : 'text-red-400'"
+            >
+              <template #icon>
+                <span class="material-symbols-rounded">delete</span>
+              </template>
+            </Button>
+          </ButtonGroup>
+        </div>
+
+        <!-- LYN: Add New Pattern -->
+        <div class="border-surface flex gap-2 border-t-4 border-dotted p-2">
+          <FloatLabel class="grow" variant="in">
+            <InputText fluid v-model="patternNameToAdd" />
+            <label>New pattern name</label>
+          </FloatLabel>
+
+          <Button
+            class="w-14"
+            @click="addPatternWrapper()"
+            :disabled="patternNameToAdd == ''"
+          >
+            <template #icon>
+              <span class="material-symbols-rounded">music_note_add</span>
+            </template>
+          </Button>
+        </div>
       </div>
 
       <div class="flex h-full w-full flex-col overflow-auto">
         <!-- LYN: Pane Conrtol -->
-        <div class="border-surface flex gap-2 border-b-4 p-2">
+        <div
+          class="border-surface dark:bg-surface-900 bg-surface-50 sticky top-0 left-0 z-50 flex min-h-[62px] gap-2 overflow-auto border-b-4 p-2"
+        >
           <SelectButton
             :allow-empty="false"
             v-model="visiblePane"
@@ -16,6 +65,7 @@
             option-label="value"
             data-key="value"
             aria-labelledby="custom"
+            :disabled="notEditing"
           >
             <template #option="slotProps">
               <span class="material-symbols-rounded">
@@ -24,7 +74,29 @@
             </template>
           </SelectButton>
 
-          <Button>
+          <!-- LYN: Page Size -->
+          <span class="h-10 w-20">
+            <FloatLabel variant="on">
+              <InputNumber
+                id="page-count"
+                fluid
+                v-if="!notEditing"
+                v-model="patternEditing!.page_count"
+                showButtons
+                :min="0"
+              />
+              <InputNumber v-else id="page-count" fluid disabled />
+              <label for="page-count">Pages</label>
+            </FloatLabel>
+          </span>
+
+          <Divider layout="vertical" />
+
+          <!-- LYN: Page Control -->
+          <Button
+            :disabled="notEditing || startingPage === 0"
+            @click="startingPage--"
+          >
             <template #icon>
               <span class="material-symbols-rounded">
                 keyboard_double_arrow_left
@@ -32,32 +104,193 @@
             </template>
           </Button>
 
-          <Button>
+          <div class="flex w-4 items-center justify-center">
+            {{ startingPage }}
+          </div>
+
+          <Button
+            :disabled="notEditing || startingPage >= patternEditing!.page_count"
+            @click="startingPage++"
+          >
             <template #icon>
               <span class="material-symbols-rounded">
                 keyboard_double_arrow_right
               </span>
             </template>
           </Button>
+
+          <Divider layout="vertical" />
+
+          <!-- LYN: Midi Path -->
+          <span class="h-10">
+            <FloatLabel variant="on">
+              <InputText
+                id="midi-path"
+                fluid
+                v-if="!notEditing"
+                v-model="patternEditing!.midi_path"
+              />
+              <InputNumber v-else id="midi-path" fluid disabled />
+              <label for="page-count">Midi Path</label>
+            </FloatLabel>
+          </span>
+
+          <Divider layout="vertical" />
+
+          <!-- LYN: Edit Control -->
+          <Button
+            :disabled="!dirty"
+            :variant="editingName != undefined && dirty ? '' : 'outlined'"
+            label="Make Edit"
+            @click="makeEdit()"
+          >
+            <template #icon>
+              <span class="material-symbols-rounded">edit_square</span>
+            </template>
+          </Button>
         </div>
 
-        <!-- LYN: Program Pane -->
-        <div class="h-full overflow-auto">
-          <MidiProgramPane v-if="visiblePane.value === 'midi'" />
+        <!-- LYN: Programming Pane -->
+        <div v-if="notEditing">select a pattern to edit</div>
+        <div v-else class="flex h-full flex-col">
+          <!-- LYN: Midi Programming -->
+          <MidiProgramPane
+            v-if="visiblePane.value === 'midi'"
+            v-model:codes="patternEditing!.midi_codes"
+            v-model:page-count="patternEditing!.page_count"
+            v-model:starting-page="startingPage"
+          />
 
+          <!-- LYN: Message Programming -->
           <MessageProgramPane v-if="visiblePane.value === 'message'" />
         </div>
       </div>
-    </div>
+    </BlockUI>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, inject, ref, watch } from "vue";
+import { PatternEditing, PatternState, Vibed } from "../App.vue";
+import { get, set } from "@vueuse/core";
+import { ButtonGroup, useConfirm } from "primevue";
+import { Pattern } from "../types/models";
 
 const programPanes = [
   { value: "midi", icon: "piano" },
   { value: "message", icon: "rate_review" },
 ];
 const visiblePane = ref<{ value: string; icon?: string }>({ value: "midi" });
+
+const { connected } = inject<Vibed>("vibed")!;
+const { patterns, addPattern, delPattern, editPattern } =
+  inject<PatternState>("pattern-state")!;
+
+// LYN: Pattern Editing
+const { name: editingName, change: setEditing } =
+  inject<PatternEditing>("pattern-editing")!;
+const patternOriginal = ref<Pattern>();
+const patternEditing = ref<Pattern>();
+watch(
+  editingName,
+  (name) => {
+    if (name != undefined) {
+      let pattern = get(patterns)?.[name];
+      if (pattern != undefined) {
+        set(patternOriginal, JSON.parse(JSON.stringify(pattern)));
+        set(patternEditing, JSON.parse(JSON.stringify(pattern)));
+      } else {
+        set(patternEditing, undefined);
+      }
+    } else {
+      set(patternEditing, undefined);
+    }
+  },
+  { immediate: true },
+);
+watch(
+  () => {
+    let name = get(editingName);
+    if (name != undefined) {
+      return get(patterns)?.[name];
+    }
+    return undefined;
+  },
+  (pattern) => {
+    if (pattern != undefined) {
+      set(patternOriginal, JSON.parse(JSON.stringify(pattern)));
+    }
+  },
+);
+const notEditing = computed(() => {
+  return editingName == undefined || get(patternEditing) == undefined;
+});
+const dirty = computed(() => {
+  return !(
+    JSON.stringify(get(patternOriginal)) == JSON.stringify(get(patternEditing))
+  );
+});
+
+// LYN: Delete Pattern
+const confirm = useConfirm();
+function confirmDelPattern(event: MouseEvent, name: string) {
+  confirm.require({
+    target: event.currentTarget as any,
+    message: "Confirm deletion?",
+    icon: "pi pi-info-circle",
+    rejectProps: {
+      label: "Cancel",
+      severity: "secondary",
+      outlined: true,
+    },
+    acceptProps: {
+      label: "Delete",
+      severity: "danger",
+    },
+    accept: () => {
+      delPattern(name);
+    },
+  });
+}
+
+// LYN: Make Page Edit
+function makeEdit() {
+  if (!get(notEditing)) {
+    editPattern(get(editingName)!, get(patternEditing)!);
+  }
+}
+
+// LYN: Page Size Syncing
+watch(
+  () => get(patternEditing)?.page_count,
+  (count) => {
+    if (count != undefined) {
+      let midi_codes = get(patternEditing)!.midi_codes;
+      if (midi_codes.length < count) {
+        for (let i = midi_codes.length; i < count; i++) {
+          midi_codes.push([null, null, null, null]);
+        }
+      } else if (midi_codes.length > count) {
+        midi_codes.splice(count);
+      }
+    }
+  },
+);
+
+// LYN: Page Scrolling
+const startingPage = ref(0);
+watch(
+  () => get(patternEditing)?.page_count,
+  (count) => {
+    if (count != undefined && get(startingPage) >= count) {
+      set(startingPage, count);
+    }
+  },
+);
+
+// LYN: Add Pattern
+const patternNameToAdd = ref<string>("");
+function addPatternWrapper() {
+  addPattern(get(patternNameToAdd));
+}
 </script>

@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{Router, routing::get};
 use communicator::{CommunicatorArg, CommunicatorState};
@@ -52,12 +48,18 @@ async fn main() {
 }
 
 fn init_state() -> HandlerState {
+    // LYN: Tracks & Patterns
+    let patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>> = Default::default();
+    let tracks: Arc<AsyncRwLock<HashMap<String, Track>>> = Default::default();
+
     // LYN: Spawn Ticker
     let (ticker_cmd_tx, ticker_cmd_rx) = mpsc::channel(32);
     let (tick_tx, tick_rx) = watch::channel(None);
     let ticker_state = TickerState {
         bpm: Arc::new(AsyncRwLock::new(DEFAULT_BPM)),
         playing: Arc::new(AsyncRwLock::new(false)),
+        tick: Arc::new(AsyncRwLock::new(None)),
+        cycle: Arc::new(AsyncRwLock::new(None)),
     };
     spawn(ticker::main(
         ticker_state.clone(),
@@ -68,11 +70,9 @@ fn init_state() -> HandlerState {
     ));
 
     // LYN: Spawn Controller
-    let patterns: Arc<RwLock<HashMap<String, Pattern>>> = Default::default();
-    let tracks: Arc<RwLock<HashMap<String, Track>>> = Default::default();
     let (controller_cmd_tx, controller_cmd_rx) = mpsc::channel(32);
     let controller_state = ControllerState {
-        context: Arc::new(RwLock::new(None)),
+        context: Arc::new(AsyncRwLock::new(None)),
     };
     spawn(controller::main(
         controller_state.clone(),
@@ -86,23 +86,27 @@ fn init_state() -> HandlerState {
 
     // LYN: Spawn Communicator
     let (communicator_cmd_tx, communicator_cmd_rx) = mpsc::channel(32);
+    let (connection_status_tx, connection_status_rx) = watch::channel(false);
     let communicator_state = CommunicatorState {
         target_addr: Arc::new(AsyncRwLock::new(DEFAULT_TARGET_ADDR.to_string())),
+        connected: Arc::new(AsyncRwLock::new(false)),
     };
     spawn(communicator::main(
         communicator_state.clone(),
         CommunicatorArg {
             cmd_rx: communicator_cmd_rx,
+            connection_status_tx,
         },
     ));
 
     // LYN: Construct App State
     let (client_cmd_broadcast, _) = broadcast::channel::<ClientCommand>(64);
     HandlerState {
-        name: Arc::new(RwLock::new(DEFAULT_NAME.to_string())),
+        name: Arc::new(AsyncRwLock::new(DEFAULT_NAME.to_string())),
         patterns,
         tracks,
         tick_rx,
+        connection_status_rx,
         ticker_cmd_tx,
         controller_cmd_tx,
         communicator_cmd_tx,

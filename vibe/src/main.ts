@@ -4,13 +4,14 @@ import App from "./App.vue";
 import PrimeVue from "primevue/config";
 import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
+import ToastService from "primevue/toastservice";
+import ConfirmationService from "primevue/confirmationservice";
 
 import "./tailwind.css";
 import "primeicons/primeicons.css";
 import "material-symbols";
 
 import router from "./router";
-import { createPinia } from "pinia";
 
 const preset = definePreset(Aura, {
   semantic: {
@@ -43,5 +44,6 @@ createApp(App)
     },
   })
   .use(router)
-  .use(createPinia())
+  .use(ToastService)
+  .use(ConfirmationService)
   .mount("#app");

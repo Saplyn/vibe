@@ -27,6 +27,9 @@
         </template>
       </Button>
     </nav>
+
+    <Toast position="center" />
+    <ConfirmPopup />
   </div>
 </template>
 
@@ -42,25 +45,25 @@ import {
   Ref,
   ref,
   UnwrapNestedRefs,
+  watch,
 } from "vue";
 import { get, set, useWebSocket } from "@vueuse/core";
 import { ClientCommand, ServerCommand } from "./types/command";
-
-// LYN: Fullscreen Detection
-const isFullscreen = ref(false);
-onMounted(async () => {
-  isFullscreen.value = await getCurrentWindow().isMaximized();
-
-  getCurrentWindow().listen("tauri://resize", async (_) => {
-    isFullscreen.value = await getCurrentWindow().isMaximized();
-  });
-});
+import { Pattern, Track } from "./types/models";
+import { useToast } from "primevue/usetoast";
+import { info } from "@tauri-apps/plugin-log";
 
 // LYN: Vibed
 const addr = ref("localhost:8000");
 const changeAddr = (newAddr: string) => set(addr, newAddr);
+const watchableResp = ref(false);
 const wsAddr = computed(() => `ws://${get(addr)}`);
-const ws = useWebSocket(wsAddr, { autoReconnect: true });
+const ws = useWebSocket(wsAddr, {
+  autoReconnect: true,
+  onMessage() {
+    set(watchableResp, !get(watchableResp));
+  },
+});
 const connected = computed(() => ws.status.value === "OPEN");
 const cmd = computed(() => JSON.parse(ws.data.value) as ClientCommand);
 const send = (cmd: ServerCommand) => ws.send(JSON.stringify(cmd));
@@ -73,6 +76,7 @@ export type Vibed = {
   connected: ComputedRef<boolean>;
   cmd: ComputedRef<ClientCommand>;
   send: (cmd: ServerCommand) => void;
+  watchableResp: Ref<boolean, boolean>;
 };
 provide<Vibed>("vibed", {
   addr: readonly(addr),
@@ -81,5 +85,195 @@ provide<Vibed>("vibed", {
   connected,
   cmd,
   send,
+  watchableResp,
+});
+
+// LYN: Toast
+const toast = useToast();
+watch([cmd, watchableResp], ([cmd, _]) => {
+  if (cmd.action === "Notify") {
+    info(cmd.payload.severity);
+    toast.add({
+      severity: cmd.payload.severity,
+      summary: cmd.payload.summary,
+      detail: cmd.payload.detail,
+      life: 3000,
+    });
+  }
+});
+
+// LYN: Fullscreen Detection
+const isFullscreen = ref(false);
+onMounted(async () => {
+  isFullscreen.value = await getCurrentWindow().isMaximized();
+
+  getCurrentWindow().listen("tauri://resize", async (_) => {
+    isFullscreen.value = await getCurrentWindow().isMaximized();
+  });
+});
+
+// LYN: Pattern Editing
+const patternName = ref<string>();
+const changeEditing = (name?: string) => set(patternName, name);
+
+// LYN: Pattern Editing (provide)
+export type PatternEditing = {
+  name: DeepReadonly<
+    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
+  >;
+  change: (name?: string) => void;
+};
+provide<PatternEditing>("pattern-editing", {
+  name: readonly(patternName),
+  change: changeEditing,
+});
+
+// LYN: Project Info
+const projectName = ref<string>();
+const changeProjectName = (name: string) => set(projectName, name);
+export type ProjectInfo = {
+  name: DeepReadonly<
+    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
+  >;
+  change: (name: string) => void;
+};
+provide<ProjectInfo>("project-info", {
+  name: readonly(projectName),
+  change: changeProjectName,
+});
+
+// LYN: Target Address
+const commAddr = ref<string>();
+const established = ref<boolean>();
+const changeCommAddr = (name: string) => set(commAddr, name);
+export type CommInfo = {
+  addr: DeepReadonly<
+    UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
+  >;
+  established: DeepReadonly<
+    UnwrapNestedRefs<Ref<boolean | undefined, boolean | undefined>>
+  >;
+  change: (name: string) => void;
+};
+provide<CommInfo>("comm-info", {
+  addr: readonly(commAddr),
+  established: readonly(established),
+  change: changeCommAddr,
+});
+
+// LYN: Patterns
+const patterns = ref<Record<string, Pattern>>();
+const addPattern = (name: string) =>
+  send({ action: "PatternAdd", payload: { name } });
+const delPattern = (name: string) =>
+  send({ action: "PatternDelete", payload: { name } });
+const editPattern = (name: string, pattern: Pattern) =>
+  send({ action: "PatternEdit", payload: { name, pattern } });
+export type PatternState = {
+  patterns: DeepReadonly<
+    UnwrapNestedRefs<
+      Ref<
+        Record<string, Pattern> | undefined,
+        Record<string, Pattern> | undefined
+      >
+    >
+  >;
+  addPattern: (name: string) => void;
+  delPattern: (name: string) => void;
+  editPattern: (name: string, pattern: Pattern) => void;
+};
+provide<PatternState>("pattern-state", {
+  patterns: readonly(patterns),
+  addPattern,
+  delPattern,
+  editPattern,
+});
+watch([cmd, watchableResp], ([cmd, _]) => {
+  switch (cmd!.action) {
+    case "PatternAdded":
+      set(patterns, {
+        ...get(patterns),
+        [cmd.payload.name]: cmd.payload.pattern,
+      });
+      break;
+    case "PatternDeleted":
+      const newPatterns = { ...get(patterns) };
+      delete newPatterns[cmd.payload.name];
+      if (get(patternName) === cmd.payload.name) {
+        set(patternName, undefined);
+      }
+      set(patterns, newPatterns);
+      break;
+    case "PatternEdited":
+      set(patterns, {
+        ...get(patterns),
+        [cmd.payload.name]: cmd.payload.pattern,
+      });
+      break;
+  }
+});
+
+// LYN: Tracks
+const tracks = ref<Record<string, Track>>();
+const addTrack = (name: string) =>
+  send({ action: "TrackAdd", payload: { name } });
+const delTrack = (name: string) =>
+  send({ action: "TrackDelete", payload: { name } });
+const editTrack = (name: string, track: Track) =>
+  send({ action: "TrackEdit", payload: { name, track } });
+export type TrackState = {
+  tracks: DeepReadonly<
+    UnwrapNestedRefs<
+      Ref<Record<string, Track> | undefined, Record<string, Track> | undefined>
+    >
+  >;
+  addTrack: (name: string) => void;
+  delTrack: (name: string) => void;
+  editTrack: (name: string, track: Track) => void;
+};
+provide<TrackState>("track-state", {
+  tracks: readonly(tracks),
+  addTrack,
+  delTrack,
+  editTrack,
+});
+
+// LYN: Data Fetching
+watch([cmd, watchableResp], ([cmd, _]) => {
+  switch (cmd!.action) {
+    case "ResponseProjectName":
+      set(projectName, cmd.payload.name);
+      break;
+    case "ResponseCommAddr":
+      set(commAddr, cmd.payload.addr);
+      break;
+    case "ResponseCommStatus":
+      set(established, cmd.payload.established);
+      break;
+    case "CommStatusChanged":
+      set(established, cmd.payload.established);
+      break;
+    case "ResponseAllTracks":
+      set(tracks, cmd.payload.tracks);
+      break;
+    case "ResponseAllPatterns":
+      set(patterns, cmd.payload.patterns);
+      break;
+  }
+});
+watch(connected, async (connected) => {
+  if (connected) {
+    send({ action: "RequestProjectName" });
+    send({ action: "RequestCommAddr" });
+    send({ action: "RequestCommStatus" });
+    send({ action: "RequestAllTracks" });
+    send({ action: "RequestAllPatterns" });
+  } else {
+    set(projectName, undefined);
+    set(commAddr, undefined);
+    set(established, undefined);
+    set(tracks, undefined);
+    set(patterns, undefined);
+  }
 });
 </script>

@@ -1,10 +1,11 @@
 export type Page<T> = [T, T, T, T];
 
 export type Pattern = {
+  name: string;
   page_count: number;
   midi_path: string;
   midi_codes: Page<number | null>[];
-  messages: Page<Messages>[];
+  messages: Messages[];
 };
 
 export type Messages = {
@@ -13,7 +14,8 @@ export type Messages = {
 };
 
 export type Track = {
-  active: boolean;
+  name: string;
+  progress: number | null;
   patterns: string[];
 };
 

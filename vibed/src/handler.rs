@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::{
@@ -13,11 +9,11 @@ use axum::{
 };
 use tokio::{
     select,
-    sync::{broadcast, mpsc, watch},
+    sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
 };
 use tracing::info;
 use vibe_types::{
-    command::{ClientCommand, ServerCommand},
+    command::{ClientCommand, ServerCommand, Severity},
     models::{Pattern, Track},
 };
 
@@ -29,11 +25,13 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct HandlerState {
-    pub name: Arc<RwLock<String>>,
+    pub name: Arc<AsyncRwLock<String>>,
 
-    pub patterns: Arc<RwLock<HashMap<String, Pattern>>>,
-    pub tracks: Arc<RwLock<HashMap<String, Track>>>,
-    pub tick_rx: watch::Receiver<Option<u8>>,
+    pub patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
+    pub tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
+
+    pub tick_rx: watch::Receiver<Option<usize>>,
+    pub connection_status_rx: watch::Receiver<bool>,
 
     pub ticker_cmd_tx: mpsc::Sender<TickerCommand>,
     pub controller_cmd_tx: mpsc::Sender<ControllerCommand>,
@@ -60,7 +58,8 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
         name,
         patterns,
         tracks,
-        tick_rx,
+        mut tick_rx,
+        mut connection_status_rx,
         ticker_cmd_tx,
         controller_cmd_tx,
         communicator_cmd_tx,
@@ -83,15 +82,18 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                     match msg {
                         Message::Text(cmd) => {
                             let cmd: ServerCommand = serde_json::from_str(&cmd).unwrap();
-                            process(
+                            process(ProcessArg {
                                 cmd,
-                                &mut socket,
-                                &ticker_cmd_tx,
-                                &client_cmd_broadcast_tx,
-                                &ticker_state,
-                                &controller_state,
-                                &communicator_state,
-                            ).await;
+                                socket: &mut socket,
+                                name: name.clone(),
+                                patterns: patterns.clone(),
+                                tracks: tracks.clone(),
+                                ticker_cmd_tx: &ticker_cmd_tx,
+                                client_cmd_broadcast_tx: &client_cmd_broadcast_tx,
+                                ticker_state: &ticker_state,
+                                controller_state: &controller_state,
+                                communicator_state: &communicator_state,
+                            }).await;
                         }
                         Message::Close(_) => {
                             break;
@@ -101,29 +103,63 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                 }
             }
             Ok(cmd) = client_cmd_broadcast_rx.recv() => {
-                info!("Sending to client: {:?}", cmd);
                 respond(&mut socket, cmd).await.unwrap();
             }
+            Ok(()) = tick_rx.changed() => {
+                let maybe_tick = *tick_rx.borrow_and_update();
+                if let Some(tick) = maybe_tick {
+                    respond(&mut socket, ClientCommand::TickerTick { tick }).await.unwrap();
+                }
+            }
+            Ok(()) = connection_status_rx.changed() => {
+                let established = *connection_status_rx.borrow_and_update();
+                respond(&mut socket, ClientCommand::CommStatusChanged {
+                    established
+                }).await.unwrap();
+            }
+
+
         }
     }
     info!("Client {} disconnected", addr);
 }
 
 async fn respond(socket: &mut WebSocket, cmd: ClientCommand) -> Result<(), axum::Error> {
+    info!("Sending to client: {:?}", cmd);
     let cmd = serde_json::to_string(&cmd).unwrap();
     socket.send(Message::Text(cmd.into())).await
 }
 
-async fn process(
+#[derive(Debug)]
+pub struct ProcessArg<'a> {
     cmd: ServerCommand,
-    socket: &mut WebSocket,
-    ticker_cmd_tx: &mpsc::Sender<TickerCommand>,
-    client_cmd_broadcast_tx: &broadcast::Sender<ClientCommand>,
-    ticker_state: &TickerState,
-    controller_state: &ControllerState,
-    communicator_state: &CommunicatorState,
-) {
+    name: Arc<AsyncRwLock<String>>,
+    patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
+    tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
+    socket: &'a mut WebSocket,
+    ticker_cmd_tx: &'a mpsc::Sender<TickerCommand>,
+    client_cmd_broadcast_tx: &'a broadcast::Sender<ClientCommand>,
+    ticker_state: &'a TickerState,
+    controller_state: &'a ControllerState,
+    communicator_state: &'a CommunicatorState,
+}
+
+async fn process(arg: ProcessArg<'_>) {
+    let ProcessArg {
+        cmd,
+        name,
+        patterns,
+        tracks,
+        socket,
+        ticker_cmd_tx,
+        client_cmd_broadcast_tx,
+        ticker_state,
+        controller_state,
+        communicator_state,
+    } = arg;
+
     match cmd {
+        // LYN: Ticker
         ServerCommand::TickerPlay => {
             ticker_cmd_tx
                 .send(crate::ticker::TickerCommand::Play)
@@ -160,6 +196,68 @@ async fn process(
                 .send(ClientCommand::TickerBpmUpdated { bpm })
                 .unwrap();
         }
+        // LYN: Pattern
+        ServerCommand::PatternAdd { name } => {
+            let mut patterns = patterns.write().await;
+            if patterns.get(&name).is_some() {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Add Pattern {}".to_string(),
+                        detail: format!("Pattern with name \"{}\" already exists", name),
+                    },
+                )
+                .await
+                .unwrap();
+            } else {
+                let pattern = Pattern::new(name.clone());
+                patterns.insert(name.clone(), pattern.clone());
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::PatternAdded { name, pattern })
+                    .unwrap();
+            }
+        }
+        ServerCommand::PatternDelete { name } => {
+            let mut patterns = patterns.write().await;
+            if patterns.remove(&name).is_some() {
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::PatternDeleted { name })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Delete Pattern".to_string(),
+                        detail: format!("Pattern with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::PatternEdit { name, pattern } => {
+            let mut patterns = patterns.write().await;
+            if let Some(existing_pattern) = patterns.get_mut(&name) {
+                *existing_pattern = pattern.clone();
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::PatternEdited { name, pattern })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: format!("Failed to Edit Pattern {}", name),
+                        detail: format!("Pattern with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        // LYN: Request
         ServerCommand::RequestTickerBpm => {
             respond(
                 socket,
@@ -167,7 +265,8 @@ async fn process(
                     bpm: *ticker_state.bpm.read().await,
                 },
             )
-            .await;
+            .await
+            .unwrap();
         }
         ServerCommand::RequestTickerPlaying => {
             respond(
@@ -176,7 +275,73 @@ async fn process(
                     playing: *ticker_state.playing.read().await,
                 },
             )
-            .await;
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestTickerTick => {
+            respond(
+                socket,
+                ClientCommand::ResponseTickerTick {
+                    tick: ticker_state
+                        .tick
+                        .read()
+                        .await
+                        .map(|val| val as isize)
+                        .unwrap_or(-1),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestProjectName => {
+            respond(
+                socket,
+                ClientCommand::ResponseProjectName {
+                    name: name.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestCommAddr => {
+            respond(
+                socket,
+                ClientCommand::ResponseCommAddr {
+                    addr: communicator_state.target_addr.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestCommStatus => {
+            respond(
+                socket,
+                ClientCommand::ResponseCommStatus {
+                    established: *communicator_state.connected.read().await,
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestAllTracks => {
+            respond(
+                socket,
+                ClientCommand::ResponseAllTracks {
+                    tracks: tracks.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestAllPatterns => {
+            respond(
+                socket,
+                ClientCommand::ResponseAllPatterns {
+                    patterns: patterns.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
         }
         _ => {
             todo!()

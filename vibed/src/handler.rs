@@ -289,6 +289,67 @@ async fn process(arg: ProcessArg<'_>) {
                 .unwrap();
             }
         }
+        // LYN: Track
+        ServerCommand::TrackAdd { name } => {
+            let mut tracks = tracks.write().await;
+            if tracks.get(&name).is_some() {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Add Track".to_string(),
+                        detail: format!("Track with name \"{}\" already exists", name),
+                    },
+                )
+                .await
+                .unwrap();
+            } else {
+                let track = Track::new(name.clone());
+                tracks.insert(name.clone(), track.clone());
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::TrackAdded { name, track })
+                    .unwrap();
+            }
+        }
+        ServerCommand::TrackDelete { name } => {
+            let mut tracks = tracks.write().await;
+            if tracks.remove(&name).is_some() {
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::TrackDeleted { name })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Delete Track".to_string(),
+                        detail: format!("Track with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::TrackEdit { name, track } => {
+            let mut tracks = tracks.write().await;
+            if let Some(existing_track) = tracks.get_mut(&name) {
+                *existing_track = track.clone();
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::TrackEdited { name, track })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Edit Track".to_string(),
+                        detail: format!("Track with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
         // LYN: Ticker
         ServerCommand::TickerPlay => {
             ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
@@ -390,6 +451,31 @@ async fn process(arg: ProcessArg<'_>) {
             .await
             .unwrap();
         }
+        ServerCommand::RequestTrack { name } => {
+            let tracks = tracks.read().await;
+            if let Some(track) = tracks.get(&name) {
+                respond(
+                    socket,
+                    ClientCommand::ResponseTrack {
+                        name: name.clone(),
+                        track: track.clone(),
+                    },
+                )
+                .await
+                .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Request Track".to_string(),
+                        detail: format!("Track with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
         ServerCommand::RequestAllPatterns => {
             respond(
                 socket,
@@ -400,6 +486,31 @@ async fn process(arg: ProcessArg<'_>) {
             .await
             .unwrap();
         }
+        ServerCommand::RequestPattern { name } => {
+            let patterns = patterns.read().await;
+            if let Some(pattern) = patterns.get(&name) {
+                respond(
+                    socket,
+                    ClientCommand::ResponsePattern {
+                        name: name.clone(),
+                        pattern: pattern.clone(),
+                    },
+                )
+                .await
+                .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Request Pattern".to_string(),
+                        detail: format!("Pattern with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
         ServerCommand::RequestCtrlContext => {
             respond(
                 socket,
@@ -409,9 +520,6 @@ async fn process(arg: ProcessArg<'_>) {
             )
             .await
             .unwrap();
-        }
-        cmd => {
-            todo!("not impled: {:?}", cmd)
         }
     }
 }

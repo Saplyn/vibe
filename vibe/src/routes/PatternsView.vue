@@ -37,14 +37,18 @@
         <!-- LYN: Add New Pattern -->
         <div class="border-surface flex gap-2 border-t-4 border-dotted p-2">
           <FloatLabel class="grow" variant="in">
-            <InputText fluid v-model="patternNameToAdd" />
+            <InputText
+              fluid
+              :disabled="!connected"
+              v-model="patternNameToAdd"
+            />
             <label>New pattern name</label>
           </FloatLabel>
 
           <Button
             class="w-14"
             @click="addPatternWrapper()"
-            :disabled="patternNameToAdd == ''"
+            :disabled="!connected || patternNameToAdd == ''"
           >
             <template #icon>
               <span class="material-symbols-rounded">music_note_add</span>
@@ -208,6 +212,7 @@ import { PatternEditing, PatternState, Vibed } from "../App.vue";
 import { get, set } from "@vueuse/core";
 import { ButtonGroup, useConfirm } from "primevue";
 import { Pattern } from "../types/models";
+import { isEqual } from "lodash";
 
 const programPanes = [
   { value: "midi", icon: "piano" },
@@ -245,13 +250,16 @@ watch(
   () => {
     let name = get(editingName);
     if (name != undefined) {
-      return get(patterns)?.[name];
+      let pat = get(patterns)?.[name];
+      if (pat != undefined) {
+        return [pat, pat.messages.length];
+      }
     }
-    return undefined;
+    return [undefined, undefined];
   },
-  (pattern) => {
-    if (pattern != undefined) {
-      set(patternOriginal, JSON.parse(JSON.stringify(pattern)));
+  ([pat, _]) => {
+    if (pat != undefined) {
+      set(patternOriginal, JSON.parse(JSON.stringify(pat)));
     } else {
       set(patternOriginal, undefined);
     }
@@ -261,9 +269,7 @@ const notEditing = computed(() => {
   return editingName == undefined || get(patternEditing) == undefined;
 });
 const dirty = computed(() => {
-  return !(
-    JSON.stringify(get(patternOriginal)) == JSON.stringify(get(patternEditing))
-  );
+  return !isEqual(get(patternOriginal), get(patternEditing));
 });
 
 // LYN: Delete Pattern

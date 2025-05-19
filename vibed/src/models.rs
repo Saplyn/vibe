@@ -1,4 +1,8 @@
+use std::{collections::HashMap, sync::Arc};
+
 use serde::{Deserialize, Serialize};
+
+use tokio::sync::RwLock as AsyncRwLock;
 
 use crate::mosc::{MinOscArg, MinOscMessage};
 
@@ -54,6 +58,9 @@ impl Pattern {
         }
         ret
     }
+    fn tick_count(&self) -> usize {
+        self.page_count * 4
+    }
 }
 
 // LYN: Track
@@ -77,11 +84,52 @@ impl Track {
             patterns: Vec::new(),
         }
     }
-    pub fn get_osc_messages(&self, tick: usize) -> Vec<MinOscMessage> {
+    pub async fn get_osc_messages_and_advance(
+        &mut self,
+        tick: usize,
+        force: bool,
+        patterns_map: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
+    ) -> Vec<MinOscMessage> {
         if !self.active {
             return vec![];
         }
-        let (page, index) = (tick / 4, tick % 4);
-        todo!()
+        if self.progress.is_none() {
+            if force || tick % 4 == 0 {
+                self.progress = Some(tick % 4);
+            } else {
+                return vec![];
+            }
+        }
+
+        let Some(mut progress) = self.progress else {
+            unreachable!()
+        };
+        let patterns_map = patterns_map.read().await;
+        let patterns = self
+            .patterns
+            .iter()
+            .filter_map(|name| patterns_map.get(name))
+            .collect::<Vec<_>>();
+        let pat = patterns.iter().find(|pat| {
+            if progress < pat.tick_count() {
+                return true;
+            }
+            progress -= pat.tick_count();
+            false
+        });
+
+        self.progress = self.progress.map(|val| {
+            if val >= patterns.iter().map(|pat| pat.tick_count()).sum() {
+                0
+            } else {
+                val + 1
+            }
+        });
+
+        if let Some(pat) = pat {
+            pat.get_osc_messages(progress)
+        } else {
+            vec![]
+        }
     }
 }

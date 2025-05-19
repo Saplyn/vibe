@@ -4,7 +4,7 @@ use tokio::{
     select,
     sync::{RwLock as AsyncRwLock, mpsc, watch},
 };
-use tracing::{info, trace, warn};
+use tracing::{info, warn};
 
 use crate::{
     communicator::CommunicatorCommand,
@@ -68,10 +68,19 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                             .unwrap();
                     }
                 } else {
-                    trace!("Controller track play not impled");
-                    let tracks = tracks.read().await;
-                    for track in tracks.iter().filter(|(_, v)| v.active) {
-
+                    let mut tracks = tracks.write().await;
+                    let mut msgs = Vec::new();
+                    for (_, track) in tracks.iter_mut().filter(|(_, v)| v.active) {
+                        msgs.push(
+                            track
+                                .get_osc_messages_and_advance(tick, false, patterns.clone())
+                                .await
+                        );
+                    }
+                    for msg in msgs.iter().flatten() {
+                        communicator_cmd_tx.send(CommunicatorCommand::SendMessage {
+                            msg: msg.clone()
+                        }).await.unwrap();
                     }
                 }
             }

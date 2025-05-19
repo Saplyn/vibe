@@ -188,6 +188,27 @@ provide<TrackState>("track-state", {
   delTrack,
   editTrack,
 });
+watch([cmd, watchableResp], ([cmd, _]) => {
+  switch (cmd!.action) {
+    case "TrackAdded":
+      set(tracks, {
+        ...get(tracks),
+        [cmd.payload.name]: cmd.payload.track,
+      });
+      break;
+    case "TrackDeleted":
+      const newTracks = { ...get(tracks) };
+      delete newTracks[cmd.payload.name];
+      set(tracks, newTracks);
+      break;
+    case "TrackEdited":
+      set(tracks, {
+        ...get(tracks),
+        [cmd.payload.name]: cmd.payload.track,
+      });
+      break;
+  }
+});
 
 // LYN: Pattern Editing
 const patternName = ref<string>();

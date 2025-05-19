@@ -3,7 +3,7 @@
     <div class="flex">
       <!-- LYN: Midi Quick Peek -->
       <div
-        class="text-primary flex w-34 shrink-0 items-center justify-center font-mono"
+        class="text-primary/70 flex w-60 shrink-0 items-center justify-end pr-2 font-mono"
       >
         Midi Peek
       </div>
@@ -17,19 +17,20 @@
               : 'bg-primary/70'
           "
         >
-          {{ codes?.[startingPage + pageOffset]?.[slot] ?? "--" }}
+          {{ codes?.[startingPage + pageOffset]?.[slot] ?? "" }}
         </div>
       </div>
     </div>
 
     <!-- LYN: Message Programming -->
     <div v-for="(msg, index) in messages" class="flex w-full">
-      <div class="flex w-34 shrink-0">
+      <div class="flex w-60 max-w-60 shrink-0">
         <ButtonGroup class="grow">
           <Button
-            :label="`${index}`"
+            :label="`${msg.payload.path}`"
             @click="togglePopover($event, index)"
-            class="rounded-none font-mono"
+            class="justify-start rounded-none font-mono"
+            :pt:label:class="'truncate max-w-34'"
             fluid
           >
             <template #icon>
@@ -38,7 +39,11 @@
               </span>
             </template>
           </Button>
-          <Button severity="danger" class="rounded-none">
+          <Button
+            severity="danger"
+            class="rounded-none"
+            @click="deleteMsg(index)"
+          >
             <template #icon>
               <span class="material-symbols-rounded">delete</span>
             </template>
@@ -192,6 +197,13 @@ const ok = computed(() => {
   return ok;
 });
 watch(ok, (ok) => set(valid, ok));
+
+// LYN: Delete Message
+function deleteMsg(index: number) {
+  const msgs = get(messages)!;
+  msgs.splice(index, 1);
+  set(messages, msgs);
+}
 
 // LYN: Styling
 function msgIcon(type: string): string {

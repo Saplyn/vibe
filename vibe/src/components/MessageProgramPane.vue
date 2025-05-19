@@ -1,5 +1,5 @@
 <template>
-  <div class="dark:bg-surface-900 bg-surface-50 h-full">
+  <div class="dark:bg-surface-900 bg-surface-50 h-full overflow-auto">
     <div class="flex">
       <!-- LYN: Midi Quick Peek -->
       <div
@@ -9,7 +9,7 @@
       </div>
       <div v-for="(_, pageOffset) in 4" class="flex w-full">
         <div
-          class="border-surface-50 dark:border-surface-900 flex h-8 shrink-0 grow items-center justify-center rounded-lg border-4"
+          class="border-surface-50 dark:border-surface-900 flex h-8 min-w-[58px] shrink-0 grow items-center justify-center rounded-lg border-4"
           v-for="(_, slot) in 4"
           :class="
             codes?.[startingPage + pageOffset]?.[slot] == null

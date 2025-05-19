@@ -179,6 +179,10 @@ const contexts = [
 watch(name, (name) => {
   if (name == undefined) {
     set(currContext, { value: "track" });
+  } else {
+    if (get(currContext).value === "pattern") {
+      send({ action: "CtrlChangeContext", payload: { context: name } });
+    }
   }
 });
 watch(

@@ -237,6 +237,14 @@ watch([cmd, watchableResp], ([cmd, _]) => {
         changeEditing(cmd.payload.context);
       }
       break;
+    case "ResponseCtrlContext":
+      set(currContext, {
+        value: cmd.payload.context == null ? "track" : "pattern",
+      });
+      if (cmd.payload.context != null) {
+        changeEditing(cmd.payload.context);
+      }
+      break;
   }
 });
 watch(connected, async (connected) => {
@@ -244,6 +252,7 @@ watch(connected, async (connected) => {
     send({ action: "RequestTickerBpm" });
     send({ action: "RequestTickerPlaying" });
     send({ action: "RequestTickerTick" });
+    send({ action: "RequestCtrlContext" });
   } else {
     set(bpm, undefined);
     set(playing, undefined);

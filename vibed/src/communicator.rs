@@ -1,5 +1,6 @@
 use std::{io, sync::Arc, time::Duration};
 
+use crate::mosc::MinOscMessage;
 use rosc::{OscPacket, encoder::encode};
 use tokio::{
     io::AsyncWriteExt,
@@ -10,7 +11,6 @@ use tokio::{
     time::sleep,
 };
 use tracing::{info, warn};
-use vibe_types::mosc::MinOscMessage;
 
 #[derive(Debug, Clone)]
 pub struct CommunicatorState {

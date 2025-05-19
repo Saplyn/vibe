@@ -11,14 +11,18 @@ use tokio::{
 };
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-use vibe_types::{
+
+use crate::{
     command::ClientCommand,
     models::{Pattern, Track},
 };
 
+mod command;
 mod communicator;
 mod controller;
 mod handler;
+mod models;
+mod mosc;
 mod ticker;
 
 const VIBED_SERVER_ADDR: &str = "0.0.0.0:8000";
@@ -98,7 +102,7 @@ fn init_state() -> HandlerState {
             tracks: tracks.clone(),
             cmd_rx: controller_cmd_rx,
             tick_rx: tick_rx.clone(),
-            communicator_cmd_tx,
+            communicator_cmd_tx: communicator_cmd_tx.clone(),
         },
     ));
 
@@ -112,6 +116,7 @@ fn init_state() -> HandlerState {
         connection_status_rx,
         ticker_cmd_tx,
         controller_cmd_tx,
+        communicator_cmd_tx,
         client_cmd_broadcast,
         ticker_state,
         controller_state,

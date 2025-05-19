@@ -6,9 +6,8 @@ use tokio::{
     time::{Instant, sleep_until},
 };
 use tracing::{info, trace, warn};
-use vibe_types::models::Pattern;
 
-use crate::controller::ControllerState;
+use crate::{controller::ControllerState, models::Pattern};
 
 #[derive(Debug)]
 pub enum TickerCommand {

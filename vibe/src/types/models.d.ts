@@ -15,6 +15,8 @@ export type Messages = {
 
 export type Track = {
   name: string;
+  active: boolean;
+  loop: boolean;
   progress: number | null;
   patterns: string[];
 };

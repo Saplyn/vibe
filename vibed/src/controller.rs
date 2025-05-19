@@ -6,9 +6,10 @@ use tokio::{
 };
 use tracing::{info, trace, warn};
 
-use vibe_types::models::{Pattern, Track};
-
-use crate::communicator::CommunicatorCommand;
+use crate::{
+    communicator::CommunicatorCommand,
+    models::{Pattern, Track},
+};
 
 #[derive(Debug, Clone)]
 pub struct ControllerState {
@@ -67,7 +68,11 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                             .unwrap();
                     }
                 } else {
-                    trace!("Controller track play not impled")
+                    trace!("Controller track play not impled");
+                    let tracks = tracks.read().await;
+                    for track in tracks.iter().filter(|(_, v)| v.active) {
+
+                    }
                 }
             }
 

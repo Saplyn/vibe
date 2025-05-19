@@ -12,15 +12,13 @@ use tokio::{
     sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
 };
 use tracing::info;
-use vibe_types::{
-    command::{ClientCommand, ServerCommand, Severity},
-    models::{Pattern, Track},
-};
 
 use crate::{
+    command::{ClientCommand, ServerCommand, Severity},
     communicator::{CommunicatorCommand, CommunicatorState},
     controller::{ControllerCommand, ControllerState},
-    ticker::{self, TickerCommand, TickerState},
+    models::{Pattern, Track},
+    ticker::{TickerCommand, TickerState},
 };
 
 #[derive(Debug, Clone)]
@@ -36,6 +34,7 @@ pub struct HandlerState {
     pub ticker_cmd_tx: mpsc::Sender<TickerCommand>,
     pub controller_cmd_tx: mpsc::Sender<ControllerCommand>,
     pub client_cmd_broadcast: broadcast::Sender<ClientCommand>,
+    pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
 
     pub ticker_state: TickerState,
     pub controller_state: ControllerState,
@@ -60,6 +59,7 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
         mut tick_rx,
         mut connection_status_rx,
         ticker_cmd_tx,
+        communicator_cmd_tx,
         controller_cmd_tx,
         client_cmd_broadcast,
         ticker_state,
@@ -89,6 +89,7 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                                 tracks: tracks.clone(),
                                 ticker_cmd_tx: &ticker_cmd_tx,
                                 controller_cmd_tx: &controller_cmd_tx,
+                                communicator_cmd_tx: &communicator_cmd_tx,
                                 client_cmd_broadcast_tx: &client_cmd_broadcast_tx,
                                 ticker_state: &ticker_state,
                                 controller_state: &controller_state,
@@ -139,7 +140,8 @@ pub struct ProcessArg<'a> {
     socket: &'a mut WebSocket,
     tick_rx: &'a watch::Receiver<(Option<usize>, usize)>,
     ticker_cmd_tx: &'a mpsc::Sender<TickerCommand>,
-    pub controller_cmd_tx: &'a mpsc::Sender<ControllerCommand>,
+    controller_cmd_tx: &'a mpsc::Sender<ControllerCommand>,
+    communicator_cmd_tx: &'a mpsc::Sender<CommunicatorCommand>,
     client_cmd_broadcast_tx: &'a broadcast::Sender<ClientCommand>,
     ticker_state: &'a TickerState,
     controller_state: &'a ControllerState,
@@ -156,6 +158,7 @@ async fn process(arg: ProcessArg<'_>) {
         tick_rx,
         ticker_cmd_tx,
         controller_cmd_tx,
+        communicator_cmd_tx,
         client_cmd_broadcast_tx,
         ticker_state,
         controller_state,
@@ -164,6 +167,23 @@ async fn process(arg: ProcessArg<'_>) {
 
     match cmd {
         // LYN: Misc
+        ServerCommand::SetProjectName { name: new_name } => {
+            *name.write().await = new_name.clone();
+            client_cmd_broadcast_tx
+                .send(ClientCommand::ProjectNameUpdated { name: new_name })
+                .unwrap();
+        }
+        ServerCommand::CommChangeAddr { addr: new_addr } => {
+            communicator_cmd_tx
+                .send(CommunicatorCommand::ChangeTargetAddr {
+                    addr: new_addr.clone(),
+                })
+                .await
+                .unwrap();
+            client_cmd_broadcast_tx
+                .send(ClientCommand::CommAddrChanged { addr: new_addr })
+                .unwrap();
+        }
         ServerCommand::CtrlChangeContext { context } => {
             if let Some(context) = context {
                 // Context: pattern
@@ -207,34 +227,6 @@ async fn process(arg: ProcessArg<'_>) {
                     .send(ClientCommand::CtrlContextChanged { context: None })
                     .unwrap();
             }
-        }
-        // LYN: Ticker
-        ServerCommand::TickerPlay => {
-            ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerPlaying)
-                .unwrap();
-        }
-        ServerCommand::TickerPause => {
-            ticker_cmd_tx.send(TickerCommand::Pause).await.unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerPaused)
-                .unwrap();
-        }
-        ServerCommand::TickerStop => {
-            ticker_cmd_tx.send(TickerCommand::Stop).await.unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerStopped)
-                .unwrap();
-        }
-        ServerCommand::TickerSetBpm { bpm } => {
-            ticker_cmd_tx
-                .send(TickerCommand::SetBPM { bpm })
-                .await
-                .unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerBpmUpdated { bpm })
-                .unwrap();
         }
         // LYN: Pattern
         ServerCommand::PatternAdd { name } => {
@@ -296,6 +288,34 @@ async fn process(arg: ProcessArg<'_>) {
                 .await
                 .unwrap();
             }
+        }
+        // LYN: Ticker
+        ServerCommand::TickerPlay => {
+            ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
+            client_cmd_broadcast_tx
+                .send(ClientCommand::TickerPlaying)
+                .unwrap();
+        }
+        ServerCommand::TickerPause => {
+            ticker_cmd_tx.send(TickerCommand::Pause).await.unwrap();
+            client_cmd_broadcast_tx
+                .send(ClientCommand::TickerPaused)
+                .unwrap();
+        }
+        ServerCommand::TickerStop => {
+            ticker_cmd_tx.send(TickerCommand::Stop).await.unwrap();
+            client_cmd_broadcast_tx
+                .send(ClientCommand::TickerStopped)
+                .unwrap();
+        }
+        ServerCommand::TickerSetBpm { bpm } => {
+            ticker_cmd_tx
+                .send(TickerCommand::SetBPM { bpm })
+                .await
+                .unwrap();
+            client_cmd_broadcast_tx
+                .send(ClientCommand::TickerBpmUpdated { bpm })
+                .unwrap();
         }
         // LYN: Request
         ServerCommand::RequestTickerBpm => {
@@ -375,6 +395,16 @@ async fn process(arg: ProcessArg<'_>) {
                 socket,
                 ClientCommand::ResponseAllPatterns {
                     patterns: patterns.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestCtrlContext => {
+            respond(
+                socket,
+                ClientCommand::ResponseCtrlContext {
+                    context: controller_state.context.read().await.clone(),
                 },
             )
             .await

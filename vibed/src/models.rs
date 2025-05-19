@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 
 use tokio::sync::RwLock as AsyncRwLock;
+use tracing::error;
 
 use crate::mosc::{MinOscArg, MinOscMessage};
 
@@ -32,15 +33,15 @@ impl Pattern {
         Self {
             name,
             page_count: 0,
-            midi_path: String::new(),
+            midi_path: String::from("/"),
             midi_codes: Vec::new(),
             messages: Vec::new(),
         }
     }
     pub fn get_osc_messages(&self, tick: usize) -> Vec<MinOscMessage> {
         let (page, index) = (tick / 4, tick % 4);
-        if page <= self.page_count {
-            eprintln!("page {page} <= count {}", self.page_count);
+        if page >= self.page_count {
+            error!("page {page} >= count {}", self.page_count);
             return vec![];
         }
 

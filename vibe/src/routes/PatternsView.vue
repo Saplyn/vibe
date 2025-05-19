@@ -2,7 +2,7 @@
   <div class="h-full">
     <BlockUI class="flex h-full w-full" :blocked="!connected">
       <div
-        class="border-surface dark:bg-surface-900 bg-surface-50 sticky top-0 left-0 z-50 flex w-1/4 max-w-96 min-w-64 shrink-0 flex-col justify-between border-r-4"
+        class="border-surface flex w-1/4 max-w-96 min-w-64 shrink-0 flex-col justify-between border-r-4"
       >
         <!-- LYN: Pattern List -->
         <div class="m-2 flex grow flex-col gap-2 overflow-auto">
@@ -57,10 +57,10 @@
         </div>
       </div>
 
-      <div class="flex h-full w-full shrink-0 flex-col overflow-auto">
+      <div class="flex h-full w-full flex-col overflow-auto">
         <!-- LYN: Pane Conrtol -->
         <div
-          class="border-surface dark:bg-surface-900 bg-surface-50 sticky top-0 left-0 z-40 flex min-h-[62px] gap-2 overflow-auto border-b-4 p-2"
+          class="border-surface dark:bg-surface-900 bg-surface-50 sticky top-0 left-0 z-50 flex min-h-[62px] gap-2 overflow-auto border-b-4 p-2"
         >
           <SelectButton
             :allow-empty="false"

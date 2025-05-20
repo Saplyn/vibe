@@ -79,6 +79,7 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                     match msg {
                         Message::Text(cmd) => {
                             let cmd: ServerCommand = serde_json::from_str(&cmd).unwrap();
+                            info!("get messages: {:?}", cmd);
                             process(ProcessArg {
                                 cmd,
                                 socket: &mut socket,

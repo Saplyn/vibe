@@ -259,7 +259,13 @@ provide<PatternEditing>("pattern-editing", {
 
 // LYN: Project Info
 const projectName = ref<string>();
-const changeProjectName = (name: string) => set(projectName, name);
+const changeProjectName = (name: string) => {
+  send({
+    action: "SetProjectName",
+    payload: { name },
+  });
+  set(projectName, name);
+};
 export type ProjectInfo = {
   name: DeepReadonly<
     UnwrapNestedRefs<Ref<string | undefined, string | undefined>>
@@ -270,11 +276,24 @@ provide<ProjectInfo>("project-info", {
   name: readonly(projectName),
   change: changeProjectName,
 });
+watch([cmd, watchableResp], ([cmd, _]) => {
+  switch (cmd!.action) {
+    case "ProjectNameUpdated":
+      set(projectName, cmd.payload.name);
+      break;
+  }
+});
 
 // LYN: Target Address
 const commAddr = ref<string>();
 const established = ref<boolean>();
-const changeCommAddr = (name: string) => set(commAddr, name);
+const changeCommAddr = (newAddr: string) => {
+  send({
+    action: "CommChangeAddr",
+    payload: { addr: newAddr },
+  });
+  set(commAddr, newAddr);
+};
 export type CommInfo = {
   addr: DeepReadonly<
     UnwrapNestedRefs<Ref<string | undefined, string | undefined>>

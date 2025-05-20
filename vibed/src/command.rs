@@ -12,11 +12,13 @@ pub enum ServerCommand {
 
     CommChangeAddr { addr: String },
 
-    CtrlChangeContext { context: Option<String> }, // ~> TickerSetCycle { cycle: Option<usize> },
+    CtrlChangeContext { context: Option<String> },
 
     TrackAdd { name: String },
     TrackDelete { name: String },
     TrackEdit { name: String, track: Track },
+    TrackMakeActive { name: String, active: bool, force: bool },
+    TrackMakeLoop { name: String, r#loop: bool },
 
     PatternAdd { name: String },
     PatternDelete { name: String },
@@ -54,10 +56,13 @@ pub enum ClientCommand {
     TrackAdded { name: String, track: Track },
     TrackDeleted { name: String },
     TrackEdited { name: String, track: Track },
+    TrackMadeActive { name: String, active: bool },
+    TrackMadeLoop { name: String, r#loop: bool },
 
     PatternAdded { name: String, pattern: Pattern },
     PatternDeleted { name: String },
     PatternEdited { name: String, pattern: Pattern },
+    TrackProgressUpdate { name: String, progress: Option<usize> },
 
     TickerPlaying,
     TickerPaused,

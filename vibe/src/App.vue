@@ -28,7 +28,7 @@
       </Button>
     </nav>
 
-    <Toast position="center" />
+    <Toast />
     <ConfirmPopup />
   </div>
 </template>
@@ -61,6 +61,7 @@ const wsAddr = computed(() => `ws://${get(addr)}`);
 const ws = useWebSocket(wsAddr, {
   autoReconnect: true,
   onMessage() {
+    info(`${get(cmd).action}`);
     set(watchableResp, !get(watchableResp));
   },
 });
@@ -172,6 +173,10 @@ const delTrack = (name: string) =>
   send({ action: "TrackDelete", payload: { name } });
 const editTrack = (name: string, track: Track) =>
   send({ action: "TrackEdit", payload: { name, track } });
+const makeTrackActive = (name: string, active: boolean, force: boolean) =>
+  send({ action: "TrackMakeActive", payload: { name, active, force } });
+const makeTrackLoop = (name: string, loop: boolean) =>
+  send({ action: "TrackMakeLoop", payload: { name, loop } });
 export type TrackState = {
   tracks: DeepReadonly<
     UnwrapNestedRefs<
@@ -181,12 +186,16 @@ export type TrackState = {
   addTrack: (name: string) => void;
   delTrack: (name: string) => void;
   editTrack: (name: string, track: Track) => void;
+  makeTrackActive: (name: string, active: boolean, force: boolean) => void;
+  makeTrackLoop: (name: string, loop: boolean) => void;
 };
 provide<TrackState>("track-state", {
   tracks: readonly(tracks),
   addTrack,
   delTrack,
   editTrack,
+  makeTrackActive,
+  makeTrackLoop,
 });
 watch([cmd, watchableResp], ([cmd, _]) => {
   switch (cmd!.action) {
@@ -206,6 +215,21 @@ watch([cmd, watchableResp], ([cmd, _]) => {
         ...get(tracks),
         [cmd.payload.name]: cmd.payload.track,
       });
+      break;
+    case "TrackProgressUpdate":
+      const newTracksProgress = { ...get(tracks) };
+      newTracksProgress[cmd.payload.name].progress = cmd.payload.progress;
+      set(tracks, newTracksProgress);
+      break;
+    case "TrackMadeActive":
+      const newTracksActive = { ...get(tracks) };
+      newTracksActive[cmd.payload.name].active = cmd.payload.active;
+      set(tracks, newTracksActive);
+      break;
+    case "TrackMadeLoop":
+      const newTracksLoop = { ...get(tracks) };
+      newTracksLoop[cmd.payload.name].loop = cmd.payload.loop;
+      set(tracks, newTracksLoop);
       break;
   }
 });

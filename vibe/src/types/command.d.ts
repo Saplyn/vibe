@@ -8,6 +8,11 @@ export type ServerCommand =
   | { action: "TrackAdd"; payload: { name: string } }
   | { action: "TrackDelete"; payload: { name: string } }
   | { action: "TrackEdit"; payload: { name: string; track: Track } }
+  | {
+      action: "TrackMakeActive";
+      payload: { name: string; active: boolean; force: boolean };
+    }
+  | { action: "TrackMakeLoop"; payload: { name: string; loop: boolean } }
   // LYN: Pattern
   | { action: "PatternAdd"; payload: { name: string } }
   | { action: "PatternDelete"; payload: { name: string } }
@@ -39,6 +44,12 @@ export type ClientCommand =
   | { action: "TrackAdded"; payload: { name: string; track: Track } }
   | { action: "TrackDeleted"; payload: { name: string } }
   | { action: "TrackEdited"; payload: { name: string; track: Track } }
+  | { action: "TrackMadeActive"; payload: { name: string; active: boolean } }
+  | { action: "TrackMadeLoop"; payload: { name: string; loop: boolean } }
+  | {
+      action: "TrackProgressUpdate";
+      payload: { name: string; progress: number | null };
+    }
   // LYN: Pattern
   | { action: "PatternAdded"; payload: { name: string; pattern: Pattern } }
   | { action: "PatternDeleted"; payload: { name: string } }

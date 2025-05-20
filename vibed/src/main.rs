@@ -70,9 +70,15 @@ fn init_state() -> HandlerState {
         connected: Arc::new(AsyncRwLock::new(false)),
     };
 
-    // LYN: Spawn Ticker
+    // LYN: Channels
     let (ticker_cmd_tx, ticker_cmd_rx) = mpsc::channel(32);
     let (tick_tx, tick_rx) = watch::channel((None, 0));
+    let (communicator_cmd_tx, communicator_cmd_rx) = mpsc::channel(32);
+    let (connection_status_tx, connection_status_rx) = watch::channel(false);
+    let (controller_cmd_tx, controller_cmd_rx) = mpsc::channel(32);
+    let (client_cmd_broadcast, _) = broadcast::channel::<ClientCommand>(64);
+
+    // LYN: Spawn Ticker
     spawn(ticker::main(
         ticker_state.clone(),
         TickerArg {
@@ -83,8 +89,6 @@ fn init_state() -> HandlerState {
     ));
 
     // LYN: Spawn Communicator
-    let (communicator_cmd_tx, communicator_cmd_rx) = mpsc::channel(32);
-    let (connection_status_tx, connection_status_rx) = watch::channel(false);
     spawn(communicator::main(
         communicator_state.clone(),
         CommunicatorArg {
@@ -94,7 +98,6 @@ fn init_state() -> HandlerState {
     ));
 
     // LYN: Spawn Controller
-    let (controller_cmd_tx, controller_cmd_rx) = mpsc::channel(32);
     spawn(controller::main(
         controller_state.clone(),
         ControllerArg {
@@ -103,11 +106,11 @@ fn init_state() -> HandlerState {
             cmd_rx: controller_cmd_rx,
             tick_rx: tick_rx.clone(),
             communicator_cmd_tx: communicator_cmd_tx.clone(),
+            client_cmd_broadcast_tx: client_cmd_broadcast.clone(),
         },
     ));
 
     // LYN: Construct App State
-    let (client_cmd_broadcast, _) = broadcast::channel::<ClientCommand>(64);
     HandlerState {
         name: Arc::new(AsyncRwLock::new(DEFAULT_NAME.to_string())),
         patterns,

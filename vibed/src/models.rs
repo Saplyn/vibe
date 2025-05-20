@@ -9,7 +9,8 @@ use crate::mosc::{MinOscArg, MinOscMessage};
 
 // LYN: Page
 
-type Page<T> = [T; 4];
+const PAGE_SIZE: usize = 4;
+type Page<T> = [T; PAGE_SIZE];
 
 // LYN: Pattern
 
@@ -39,7 +40,7 @@ impl Pattern {
         }
     }
     pub fn get_osc_messages(&self, tick: usize) -> Vec<MinOscMessage> {
-        let (page, index) = (tick / 4, tick % 4);
+        let (page, index) = (tick / PAGE_SIZE, tick % PAGE_SIZE);
         if page >= self.page_count {
             error!("page {page} >= count {}", self.page_count);
             return vec![];
@@ -60,7 +61,7 @@ impl Pattern {
         ret
     }
     fn tick_count(&self) -> usize {
-        self.page_count * 4
+        self.page_count * PAGE_SIZE
     }
 }
 
@@ -88,20 +89,27 @@ impl Track {
     pub async fn get_osc_messages_and_advance(
         &mut self,
         tick: usize,
-        force: bool,
         patterns_map: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
     ) -> Vec<MinOscMessage> {
         if !self.active {
-            return vec![];
+            if let Some(progress) = self.progress {
+                if progress % 4 == 0 {
+                    self.progress = None;
+                    return vec![];
+                }
+            } else {
+                return vec![];
+            }
         }
         if self.progress.is_none() {
-            if force || tick % 4 == 0 {
+            if tick % 4 == 0 {
                 self.progress = Some(tick % 4);
             } else {
                 return vec![];
             }
         }
 
+        error!("track playable");
         let Some(mut progress) = self.progress else {
             unreachable!()
         };
@@ -119,13 +127,17 @@ impl Track {
             false
         });
 
-        self.progress = self.progress.map(|val| {
-            if val >= patterns.iter().map(|pat| pat.tick_count()).sum() {
-                0
+        self.progress =
+            if self.progress.unwrap() + 1 >= patterns.iter().map(|pat| pat.tick_count()).sum() {
+                if self.r#loop {
+                    Some(0)
+                } else {
+                    self.active = false;
+                    None
+                }
             } else {
-                val + 1
-            }
-        });
+                self.progress.map(|val| val + 1)
+            };
 
         if let Some(pat) = pat {
             pat.get_osc_messages(progress)

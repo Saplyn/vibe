@@ -49,6 +49,7 @@
             class="w-14"
             @click="addPatternWrapper()"
             :disabled="!connected || patternNameToAdd == ''"
+            :ref="addPatternButtonRef"
           >
             <template #icon>
               <span class="material-symbols-rounded">music_note_add</span>
@@ -209,10 +210,10 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from "vue";
 import { PatternEditing, PatternState, Vibed } from "../App.vue";
-import { get, set } from "@vueuse/core";
+import { get, onKeyStroke, set, useFocus } from "@vueuse/core";
 import { ButtonGroup, useConfirm } from "primevue";
 import { Pattern } from "../types/models";
-import { isEqual } from "lodash";
+import { cloneDeep, isEqual } from "lodash";
 
 const programPanes = [
   { value: "midi", icon: "piano" },
@@ -235,8 +236,8 @@ watch(
     if (name != undefined) {
       let pattern = get(patterns)?.[name];
       if (pattern != undefined) {
-        set(patternOriginal, JSON.parse(JSON.stringify(pattern)));
-        set(patternEditing, JSON.parse(JSON.stringify(pattern)));
+        set(patternOriginal, cloneDeep(pattern));
+        set(patternEditing, cloneDeep(pattern));
       } else {
         set(patternEditing, undefined);
       }
@@ -259,7 +260,7 @@ watch(
   },
   ([pat, _]) => {
     if (pat != undefined) {
-      set(patternOriginal, JSON.parse(JSON.stringify(pat)));
+      set(patternOriginal, cloneDeep(pat));
     } else {
       set(patternOriginal, undefined);
     }
@@ -344,7 +345,20 @@ watch(
 const patternNameToAdd = ref<string>("");
 function addPatternWrapper() {
   addPattern(get(patternNameToAdd));
+  set(patternNameToAdd, "");
 }
+const addPatternButtonRef = ref();
+const { focused: addPatternButtonFocused } = useFocus(addPatternButtonRef);
+onKeyStroke(
+  "Enter",
+  (e) => {
+    if (addPatternButtonFocused && connected && get(patternNameToAdd) != "") {
+      addPatternWrapper();
+      e.preventDefault();
+    }
+  },
+  { dedupe: true },
+);
 
 // LYN: Add New Message
 function addNewMessage() {

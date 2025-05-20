@@ -33,8 +33,8 @@ pub struct HandlerState {
 
     pub ticker_cmd_tx: mpsc::Sender<TickerCommand>,
     pub controller_cmd_tx: mpsc::Sender<ControllerCommand>,
-    pub client_cmd_broadcast: broadcast::Sender<ClientCommand>,
     pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
+    pub client_cmd_broadcast: broadcast::Sender<ClientCommand>,
 
     pub ticker_state: TickerState,
     pub controller_state: ControllerState,
@@ -109,7 +109,9 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
             Ok(()) = tick_rx.changed() => {
                 let maybe_tick = *tick_rx.borrow_and_update();
                 if let (Some(tick), max) = maybe_tick {
-                    respond(&mut socket, ClientCommand::TickerTick { tick, max }).await.unwrap();
+                    respond(&mut socket, ClientCommand::TickerTick { tick, max })
+                        .await
+                        .unwrap();
                 }
             }
             Ok(()) = connection_status_rx.changed() => {
@@ -350,6 +352,53 @@ async fn process(arg: ProcessArg<'_>) {
                 .unwrap();
             }
         }
+        ServerCommand::TrackMakeActive {
+            name,
+            active,
+            force: _,
+        } => {
+            let mut tracks = tracks.write().await;
+            if let Some(track) = tracks.get_mut(&name) {
+                track.active = active;
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::TrackMadeActive {
+                        name: name.clone(),
+                        active,
+                    })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Make Active".to_string(),
+                        detail: format!("Track with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::TrackMakeLoop { name, r#loop } => {
+            let mut tracks = tracks.write().await;
+            if let Some(track) = tracks.get_mut(&name) {
+                track.r#loop = r#loop;
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::TrackMadeLoop { name, r#loop })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Make Loop".to_string(),
+                        detail: format!("Track with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
         // LYN: Ticker
         ServerCommand::TickerPlay => {
             ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
@@ -368,6 +417,15 @@ async fn process(arg: ProcessArg<'_>) {
             client_cmd_broadcast_tx
                 .send(ClientCommand::TickerStopped)
                 .unwrap();
+            for track in tracks.write().await.values_mut() {
+                track.progress = None;
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::TrackProgressUpdate {
+                        name: track.name.clone(),
+                        progress: None,
+                    })
+                    .unwrap();
+            }
         }
         ServerCommand::TickerSetBpm { bpm } => {
             ticker_cmd_tx

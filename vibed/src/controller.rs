@@ -2,11 +2,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::{
     select,
-    sync::{RwLock as AsyncRwLock, mpsc, watch},
+    sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
 };
 use tracing::{info, warn};
 
 use crate::{
+    command::ClientCommand,
     communicator::CommunicatorCommand,
     models::{Pattern, Track},
 };
@@ -23,6 +24,7 @@ pub struct ControllerArg {
     pub cmd_rx: mpsc::Receiver<ControllerCommand>,
     pub tick_rx: watch::Receiver<(Option<usize>, usize)>,
     pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
+    pub client_cmd_broadcast_tx: broadcast::Sender<ClientCommand>,
 }
 
 #[derive(Debug)]
@@ -40,6 +42,7 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
         mut cmd_rx,
         mut tick_rx,
         communicator_cmd_tx,
+        client_cmd_broadcast_tx,
     } = arg;
 
     loop {
@@ -70,12 +73,23 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                 } else {
                     let mut tracks = tracks.write().await;
                     let mut msgs = Vec::new();
-                    for (_, track) in tracks.iter_mut().filter(|(_, v)| v.active) {
+                    for (_, track) in tracks.iter_mut().filter(|(_, t)| t.active || t.progress.is_some()) {
                         msgs.push(
                             track
-                                .get_osc_messages_and_advance(tick, false, patterns.clone())
+                                .get_osc_messages_and_advance(tick, patterns.clone())
                                 .await
                         );
+
+                        client_cmd_broadcast_tx.send(ClientCommand::TrackProgressUpdate {
+                            name: track.name.clone(),
+                            progress: track.progress,
+                        }).unwrap();
+                        if !track.active {
+                            client_cmd_broadcast_tx.send(ClientCommand::TrackMadeActive {
+                                name: track.name.clone(),
+                                active: false,
+                            }).unwrap();
+                        }
                     }
                     for msg in msgs.iter().flatten() {
                         communicator_cmd_tx.send(CommunicatorCommand::SendMessage {

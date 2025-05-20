@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use tokio::{
     select,
@@ -6,11 +6,7 @@ use tokio::{
 };
 use tracing::{info, warn};
 
-use crate::{
-    command::ClientCommand,
-    communicator::CommunicatorCommand,
-    models::{Pattern, Track},
-};
+use crate::{command::ClientCommand, communicator::CommunicatorCommand, store::Store};
 
 #[derive(Debug, Clone)]
 pub struct ControllerState {
@@ -19,8 +15,7 @@ pub struct ControllerState {
 
 #[derive(Debug)]
 pub struct ControllerArg {
-    pub patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
-    pub tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
+    pub store: Store,
     pub cmd_rx: mpsc::Receiver<ControllerCommand>,
     pub tick_rx: watch::Receiver<(Option<usize>, usize)>,
     pub communicator_cmd_tx: mpsc::Sender<CommunicatorCommand>,
@@ -37,8 +32,7 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
 
     let ControllerState { context } = state;
     let ControllerArg {
-        patterns,
-        tracks,
+        store,
         mut cmd_rx,
         mut tick_rx,
         communicator_cmd_tx,
@@ -60,7 +54,7 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                 };
 
                 if let Some(pattern_name) = context.read().await.as_ref() {
-                    let patterns = patterns.read().await;
+                    let patterns = store.patterns.read().await;
                     let Some(pattern) = patterns.get(pattern_name) else {
                         warn!("Pattern {} not found", pattern_name);
                         continue;
@@ -71,12 +65,12 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                             .unwrap();
                     }
                 } else {
-                    let mut tracks = tracks.write().await;
+                    let mut tracks = store.tracks.write().await;
                     let mut msgs = Vec::new();
                     for (_, track) in tracks.iter_mut().filter(|(_, t)| t.active || t.progress.is_some()) {
                         msgs.push(
                             track
-                                .get_osc_messages_and_advance(tick, patterns.clone())
+                                .get_osc_messages_and_advance(tick, store.patterns.clone())
                                 .await
                         );
 

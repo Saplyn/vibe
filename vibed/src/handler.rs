@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::{
@@ -18,6 +18,7 @@ use crate::{
     communicator::{CommunicatorCommand, CommunicatorState},
     controller::{ControllerCommand, ControllerState},
     models::{Pattern, Track},
+    store::Store,
     ticker::{TickerCommand, TickerState},
 };
 
@@ -25,8 +26,7 @@ use crate::{
 pub struct HandlerState {
     pub name: Arc<AsyncRwLock<String>>,
 
-    pub patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
-    pub tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
+    pub store: Store,
 
     pub tick_rx: watch::Receiver<(Option<usize>, usize)>,
     pub connection_status_rx: watch::Receiver<bool>,
@@ -54,8 +54,7 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
 
     let HandlerState {
         name,
-        patterns,
-        tracks,
+        store,
         mut tick_rx,
         mut connection_status_rx,
         ticker_cmd_tx,
@@ -84,9 +83,8 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                                 cmd,
                                 socket: &mut socket,
                                 name: name.clone(),
-                                patterns: patterns.clone(),
+                                store: store.clone(),
                                 tick_rx: &tick_rx,
-                                tracks: tracks.clone(),
                                 ticker_cmd_tx: &ticker_cmd_tx,
                                 controller_cmd_tx: &controller_cmd_tx,
                                 communicator_cmd_tx: &communicator_cmd_tx,
@@ -137,8 +135,7 @@ async fn respond(socket: &mut WebSocket, cmd: ClientCommand) -> Result<(), axum:
 pub struct ProcessArg<'a> {
     cmd: ServerCommand,
     name: Arc<AsyncRwLock<String>>,
-    patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
-    tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
+    pub store: Store,
     socket: &'a mut WebSocket,
     tick_rx: &'a watch::Receiver<(Option<usize>, usize)>,
     ticker_cmd_tx: &'a mpsc::Sender<TickerCommand>,
@@ -154,8 +151,7 @@ async fn process(arg: ProcessArg<'_>) {
     let ProcessArg {
         cmd,
         name,
-        patterns,
-        tracks,
+        store,
         socket,
         tick_rx,
         ticker_cmd_tx,
@@ -189,7 +185,8 @@ async fn process(arg: ProcessArg<'_>) {
         ServerCommand::CtrlChangeContext { context } => {
             if let Some(context) = context {
                 // Context: pattern
-                let cycle = patterns
+                let cycle = store
+                    .patterns
                     .read()
                     .await
                     .get(&context)
@@ -232,7 +229,7 @@ async fn process(arg: ProcessArg<'_>) {
         }
         // LYN: Pattern
         ServerCommand::PatternAdd { name } => {
-            let mut patterns = patterns.write().await;
+            let mut patterns = store.patterns.write().await;
             if patterns.get(&name).is_some() {
                 respond(
                     socket,
@@ -253,7 +250,7 @@ async fn process(arg: ProcessArg<'_>) {
             }
         }
         ServerCommand::PatternDelete { name } => {
-            let mut patterns = patterns.write().await;
+            let mut patterns = store.patterns.write().await;
             if patterns.remove(&name).is_some() {
                 client_cmd_broadcast_tx
                     .send(ClientCommand::PatternDeleted { name })
@@ -272,7 +269,7 @@ async fn process(arg: ProcessArg<'_>) {
             }
         }
         ServerCommand::PatternEdit { name, pattern } => {
-            let mut patterns = patterns.write().await;
+            let mut patterns = store.patterns.write().await;
             if let Some(existing_pattern) = patterns.get_mut(&name) {
                 *existing_pattern = pattern.clone();
                 client_cmd_broadcast_tx
@@ -293,7 +290,7 @@ async fn process(arg: ProcessArg<'_>) {
         }
         // LYN: Track
         ServerCommand::TrackAdd { name } => {
-            let mut tracks = tracks.write().await;
+            let mut tracks = store.tracks.write().await;
             if tracks.get(&name).is_some() {
                 respond(
                     socket,
@@ -314,7 +311,7 @@ async fn process(arg: ProcessArg<'_>) {
             }
         }
         ServerCommand::TrackDelete { name } => {
-            let mut tracks = tracks.write().await;
+            let mut tracks = store.tracks.write().await;
             if tracks.remove(&name).is_some() {
                 client_cmd_broadcast_tx
                     .send(ClientCommand::TrackDeleted { name })
@@ -333,7 +330,7 @@ async fn process(arg: ProcessArg<'_>) {
             }
         }
         ServerCommand::TrackEdit { name, track } => {
-            let mut tracks = tracks.write().await;
+            let mut tracks = store.tracks.write().await;
             if let Some(existing_track) = tracks.get_mut(&name) {
                 *existing_track = track.clone();
                 client_cmd_broadcast_tx
@@ -357,7 +354,7 @@ async fn process(arg: ProcessArg<'_>) {
             active,
             force,
         } => {
-            let mut tracks = tracks.write().await;
+            let mut tracks = store.tracks.write().await;
             if let Some(track) = tracks.get_mut(&name) {
                 track.active = active;
                 if force {
@@ -384,7 +381,7 @@ async fn process(arg: ProcessArg<'_>) {
             }
         }
         ServerCommand::TrackMakeLoop { name, r#loop } => {
-            let mut tracks = tracks.write().await;
+            let mut tracks = store.tracks.write().await;
             if let Some(track) = tracks.get_mut(&name) {
                 track.r#loop = r#loop;
                 client_cmd_broadcast_tx
@@ -421,7 +418,7 @@ async fn process(arg: ProcessArg<'_>) {
             client_cmd_broadcast_tx
                 .send(ClientCommand::TickerStopped)
                 .unwrap();
-            for track in tracks.write().await.values_mut() {
+            for track in store.tracks.write().await.values_mut() {
                 track.progress = None;
                 client_cmd_broadcast_tx
                     .send(ClientCommand::TrackProgressUpdate {
@@ -507,14 +504,14 @@ async fn process(arg: ProcessArg<'_>) {
             respond(
                 socket,
                 ClientCommand::ResponseAllTracks {
-                    tracks: tracks.read().await.clone(),
+                    tracks: store.tracks.read().await.clone(),
                 },
             )
             .await
             .unwrap();
         }
         ServerCommand::RequestTrack { name } => {
-            let tracks = tracks.read().await;
+            let tracks = store.tracks.read().await;
             if let Some(track) = tracks.get(&name) {
                 respond(
                     socket,
@@ -542,14 +539,14 @@ async fn process(arg: ProcessArg<'_>) {
             respond(
                 socket,
                 ClientCommand::ResponseAllPatterns {
-                    patterns: patterns.read().await.clone(),
+                    patterns: store.patterns.read().await.clone(),
                 },
             )
             .await
             .unwrap();
         }
         ServerCommand::RequestPattern { name } => {
-            let patterns = patterns.read().await;
+            let patterns = store.patterns.read().await;
             if let Some(pattern) = patterns.get(&name) {
                 respond(
                     socket,

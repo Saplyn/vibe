@@ -1,9 +1,10 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{Router, routing::get};
 use communicator::{CommunicatorArg, CommunicatorState};
 use controller::{ControllerArg, ControllerState};
 use handler::{HandlerState, ws_upgrader};
+use store::Store;
 use ticker::{TickerArg, TickerState};
 use tokio::{
     signal, spawn,
@@ -12,10 +13,7 @@ use tokio::{
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use crate::{
-    command::ClientCommand,
-    models::{Pattern, Track},
-};
+use crate::command::ClientCommand;
 
 mod command;
 mod communicator;
@@ -23,6 +21,7 @@ mod controller;
 mod handler;
 mod models;
 mod mosc;
+mod store;
 mod ticker;
 
 const VIBED_SERVER_ADDR: &str = "0.0.0.0:8000";
@@ -36,7 +35,8 @@ async fn main() {
         .with_env_filter(EnvFilter::new("vibed=trace"))
         .init();
 
-    let state = init_state();
+    let store = Store::load();
+    let state = init_state(store.clone());
     let router = Router::new().route("/", get(ws_upgrader)).with_state(state);
     let listener = tokio::net::TcpListener::bind(VIBED_SERVER_ADDR)
         .await
@@ -47,22 +47,18 @@ async fn main() {
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal())
+    .with_graceful_shutdown(shutdown_signal(store))
     .await
     .unwrap();
 }
 
-fn init_state() -> HandlerState {
-    // LYN: Tracks & Patterns
-    let patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>> = Default::default();
-    let tracks: Arc<AsyncRwLock<HashMap<String, Track>>> = Default::default();
-
+fn init_state(store: Store) -> HandlerState {
     // LYN: States
     let controller_state = ControllerState {
         context: Arc::new(AsyncRwLock::new(None)),
     };
     let ticker_state = TickerState {
-        patterns: patterns.clone(),
+        patterns: store.patterns.clone(),
         bpm: Arc::new(AsyncRwLock::new(DEFAULT_BPM)),
         playing: Arc::new(AsyncRwLock::new(false)),
     };
@@ -102,8 +98,7 @@ fn init_state() -> HandlerState {
     spawn(controller::main(
         controller_state.clone(),
         ControllerArg {
-            patterns: patterns.clone(),
-            tracks: tracks.clone(),
+            store: store.clone(),
             cmd_rx: controller_cmd_rx,
             tick_rx: tick_rx.clone(),
             communicator_cmd_tx: communicator_cmd_tx.clone(),
@@ -114,8 +109,7 @@ fn init_state() -> HandlerState {
     // LYN: Construct App State
     HandlerState {
         name: Arc::new(AsyncRwLock::new(DEFAULT_NAME.to_string())),
-        patterns,
-        tracks,
+        store,
         tick_rx,
         connection_status_rx,
         ticker_cmd_tx,
@@ -128,7 +122,7 @@ fn init_state() -> HandlerState {
     }
 }
 
-async fn shutdown_signal() {
+async fn shutdown_signal(store: Store) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -147,11 +141,11 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => graceful_shutdown(),
-        _ = terminate => graceful_shutdown(),
+        _ = ctrl_c => graceful_shutdown(store),
+        _ = terminate => graceful_shutdown(store),
     }
 }
 
-fn graceful_shutdown() {
-    println!("shutdown")
+fn graceful_shutdown(store: Store) {
+    println!("shutdown");
 }

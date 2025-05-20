@@ -6,7 +6,7 @@ use controller::{ControllerArg, ControllerState};
 use handler::{HandlerState, ws_upgrader};
 use ticker::{TickerArg, TickerState};
 use tokio::{
-    spawn,
+    signal, spawn,
     sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
 };
 use tracing::info;
@@ -47,6 +47,7 @@ async fn main() {
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal())
     .await
     .unwrap();
 }
@@ -125,4 +126,32 @@ fn init_state() -> HandlerState {
         controller_state,
         communicator_state,
     }
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => graceful_shutdown(),
+        _ = terminate => graceful_shutdown(),
+    }
+}
+
+fn graceful_shutdown() {
+    println!("shutdown")
 }

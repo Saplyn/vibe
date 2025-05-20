@@ -5,7 +5,7 @@ use tokio::{
     sync::{RwLock as AsyncRwLock, mpsc, watch},
     time::{Instant, sleep_until},
 };
-use tracing::{info, trace, warn};
+use tracing::{info, warn};
 
 use crate::{controller::ControllerState, models::Pattern};
 
@@ -77,7 +77,6 @@ pub async fn main(state: TickerState, arg: TickerArg) {
                             continue;
                         }
                         Some(cycle) => {
-                            trace!("tick {:?}!", tick);
                             let limit = 4 * cycle - 1;
                             if tick.unwrap() > limit {
                                 tick = Some(limit);
@@ -90,7 +89,6 @@ pub async fn main(state: TickerState, arg: TickerArg) {
                     }
                 } else {
                     // track
-                    trace!("tick {:?}!", tick);
                     if tick.unwrap() > 15 {
                         tick = Some(15);
                     }

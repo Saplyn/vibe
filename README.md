@@ -8,5 +8,6 @@ Ensure [Rust](https://www.rust-lang.org/) and [Bun](https://bun.sh/) are install
 # Building the server: `vibed`
 cargo build
 # Building the client: `vibe`
+bun install
 NO_STRIP=true bunx tauri build
 ```

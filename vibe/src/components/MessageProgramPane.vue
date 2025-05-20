@@ -156,7 +156,6 @@
 import { computed, ref, watch } from "vue";
 import { Messages, Page } from "../types/models";
 import { get, set } from "@vueuse/core";
-import { info } from "@tauri-apps/plugin-log";
 
 const messages = defineModel<Messages[]>("messages");
 const valid = defineModel<boolean>("valid");

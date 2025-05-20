@@ -23,14 +23,18 @@
       </div>
 
       <!-- LYN: Tracks View -->
-      <div class="flex flex-col gap-2 p-2">
-        <div v-for="track in tracks" class="flex gap-4">
-          <div class="flex h-18 w-80 min-w-50">
+      <div class="flex flex-col gap-4 p-4">
+        <div v-for="track in tracks" class="flex gap-2">
+          <div class="flex h-20 w-80 min-w-50">
             <ButtonGroup class="grow">
               <!-- LYN: Make Active -->
               <Button
                 class="border-surface grow basis-3/4 justify-start border-1"
-                @click="makeTrackActiveWrapper(track.name, !track.active)"
+                @click="
+                  activeStateMatch(track.name)
+                    ? makeTrackActiveWrapper(track.name, !track.active)
+                    : makeTrackActiveWrapper(track.name, track.active, true)
+                "
                 :label="track.name"
                 :severity="
                   track.active
@@ -73,19 +77,27 @@
             </ButtonGroup>
           </div>
 
+          <!-- LYN: Pattern Display -->
           <div class="flex h-full grow flex-col gap-2">
             <div class="flex grow gap-2">
               <div
-                v-for="pat in track.patterns"
-                class="dark:bg-surface-600 bg-surface-300 flex grow items-center justify-center rounded-md font-mono text-lg"
+                v-if="track.patterns.length === 0"
+                class="dark:bg-surface-700 bg-surface-200 text-surface-400 dark:text-surface-500 flex grow items-center justify-center rounded-md font-mono text-lg"
               >
-                {{ pat }}
+                <span class="material-symbols-rounded">block</span>
+              </div>
+              <div
+                v-else
+                v-for="pat in track.patterns"
+                class="dark:bg-surface-700 bg-surface-200 text-surface-500 dark:text-surface-400 flex grow items-center justify-center rounded-md font-mono text-lg"
+              >
+                {{ pat }}({{ patternIsValidAndLength(pat) ?? "?" }})
               </div>
             </div>
 
             <ProgressBar
               :value="getTrackProgressPercent(track.name)"
-              pt:value:class="duration-[0ms] dark:bg-surface-600 bg-surface-300"
+              pt:value:class="duration-[0ms] bg-primary/60"
               pt:label:class="hidden"
             />
           </div>
@@ -194,7 +206,7 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, watch } from "vue";
-import { PatternState, TrackState, Vibed } from "../App.vue";
+import { PatternState, PlayingState, TrackState, Vibed } from "../App.vue";
 import { get, onKeyStroke, set, useFocus } from "@vueuse/core";
 import { Track } from "../types/models";
 import { cloneDeep, isEqual } from "lodash";
@@ -202,6 +214,7 @@ import { useConfirm } from "primevue";
 
 const { connected } = inject<Vibed>("vibed")!;
 const { patterns } = inject<PatternState>("pattern-state")!;
+const { playing } = inject<PlayingState>("playing")!;
 const {
   tracks,
   delTrack,
@@ -355,6 +368,17 @@ function makeTrackLoopWrapper(name: string, loop: boolean) {
 }
 
 // LYN: Track Play
+function activeStateMatch(name: string): boolean {
+  let track = get(tracks)?.[name];
+  if (track == undefined) {
+    return true;
+  }
+  return (
+    !get(playing) ||
+    (track.active && track.progress != null) ||
+    (!track.active && track.progress == null)
+  );
+}
 function makeTrackActiveWrapper(
   name: string,
   active: boolean,
@@ -366,7 +390,7 @@ function makeTrackActiveWrapper(
   }
 }
 
-// LYN: Check Pattern Valid
+// LYN: Check Pattern Valid & Length
 function patternIsValidAndLength(name: string): number | undefined {
   if (name == "") {
     return undefined;

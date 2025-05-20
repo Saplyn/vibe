@@ -136,12 +136,12 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, watch } from "vue";
-import { CommInfo, PatternEditing, Vibed } from "../App.vue";
+import { CommInfo, PatternEditing, PlayingState, Vibed } from "../App.vue";
 import { get, set } from "@vueuse/core";
 
 // LYN: Styling States
 const bpm = ref<number>();
-const playing = ref<boolean>();
+const { playing, setPlaying } = inject<PlayingState>("playing")!;
 const tick = ref<number>(-1);
 const max = ref<number>(-1);
 
@@ -207,14 +207,14 @@ const { connected, wsAddr, cmd, send, watchableResp } = inject<Vibed>("vibed")!;
 watch([cmd, watchableResp], ([cmd, _]) => {
   switch (cmd!.action) {
     case "TickerPlaying":
-      set(playing, true);
+      setPlaying(true);
       break;
     case "TickerPaused":
-      set(playing, false);
+      setPlaying(false);
       break;
     case "TickerStopped":
       set(tick, -1);
-      set(playing, false);
+      setPlaying(false);
       break;
     case "TickerBpmUpdated":
       set(bpm, cmd.payload.bpm);
@@ -223,7 +223,7 @@ watch([cmd, watchableResp], ([cmd, _]) => {
       set(bpm, cmd.payload.bpm);
       break;
     case "ResponseTickerPlaying":
-      set(playing, cmd.payload.playing);
+      setPlaying(cmd.payload.playing);
       break;
     case "ResponseTickerTick":
       set(tick, cmd.payload.tick);

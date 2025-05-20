@@ -76,6 +76,16 @@ pub struct Track {
     pub patterns: Vec<String>,
 }
 
+fn mod_beat(total_length: usize, beat: usize) -> usize {
+    if total_length >= 16 {
+        beat % 16
+    } else if total_length >= 8 {
+        beat % 8
+    } else {
+        beat % 4
+    }
+}
+
 impl Track {
     pub fn new(name: String) -> Self {
         Self {
@@ -91,9 +101,17 @@ impl Track {
         tick: usize,
         patterns_map: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
     ) -> Vec<MinOscMessage> {
+        let patterns_map = patterns_map.read().await;
+        let patterns = self
+            .patterns
+            .iter()
+            .filter_map(|name| patterns_map.get(name))
+            .collect::<Vec<_>>();
+        let total_length = patterns.iter().map(|pat| pat.tick_count()).sum();
+
         if !self.active {
             if let Some(progress) = self.progress {
-                if progress % 4 == 0 {
+                if mod_beat(total_length, progress) == 0 {
                     self.progress = None;
                     return vec![];
                 }
@@ -102,8 +120,8 @@ impl Track {
             }
         }
         if self.progress.is_none() {
-            if tick % 4 == 0 {
-                self.progress = Some(tick % 4);
+            if mod_beat(total_length, tick) == 0 {
+                self.progress = Some(mod_beat(total_length, tick));
             } else {
                 return vec![];
             }
@@ -113,12 +131,6 @@ impl Track {
         let Some(mut progress) = self.progress else {
             unreachable!()
         };
-        let patterns_map = patterns_map.read().await;
-        let patterns = self
-            .patterns
-            .iter()
-            .filter_map(|name| patterns_map.get(name))
-            .collect::<Vec<_>>();
         let pat = patterns.iter().find(|pat| {
             if progress < pat.tick_count() {
                 return true;
@@ -127,17 +139,16 @@ impl Track {
             false
         });
 
-        self.progress =
-            if self.progress.unwrap() + 1 >= patterns.iter().map(|pat| pat.tick_count()).sum() {
-                if self.r#loop {
-                    Some(0)
-                } else {
-                    self.active = false;
-                    None
-                }
+        self.progress = if self.progress.unwrap() + 1 >= total_length {
+            if self.r#loop {
+                Some(0)
             } else {
-                self.progress.map(|val| val + 1)
-            };
+                self.active = false;
+                None
+            }
+        } else {
+            self.progress.map(|val| val + 1)
+        };
 
         if let Some(pat) = pat {
             pat.get_osc_messages(progress)

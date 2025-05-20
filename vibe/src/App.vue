@@ -290,6 +290,20 @@ provide<CommInfo>("comm-info", {
   change: changeCommAddr,
 });
 
+// LYN: Playing
+const playing = ref<boolean>();
+const setPlaying = (newPlaying?: boolean) => set(playing, newPlaying);
+export type PlayingState = {
+  playing: DeepReadonly<
+    UnwrapNestedRefs<Ref<boolean | undefined, boolean | undefined>>
+  >;
+  setPlaying: (newPlaying: boolean) => void;
+};
+provide<PlayingState>("playing", {
+  playing: readonly(playing),
+  setPlaying,
+});
+
 // LYN: Data Fetching
 watch([cmd, watchableResp], ([cmd, _]) => {
   switch (cmd!.action) {

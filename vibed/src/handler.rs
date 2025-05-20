@@ -355,11 +355,15 @@ async fn process(arg: ProcessArg<'_>) {
         ServerCommand::TrackMakeActive {
             name,
             active,
-            force: _,
+            force,
         } => {
             let mut tracks = tracks.write().await;
             if let Some(track) = tracks.get_mut(&name) {
                 track.active = active;
+                if force {
+                    let (tick, _) = *tick_rx.borrow();
+                    track.progress = tick.map(|val| val % 4);
+                }
                 client_cmd_broadcast_tx
                     .send(ClientCommand::TrackMadeActive {
                         name: name.clone(),

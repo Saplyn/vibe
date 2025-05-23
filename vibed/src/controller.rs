@@ -1,12 +1,15 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use tokio::{
     select,
     sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
+    time::{Instant, interval_at},
 };
 use tracing::{info, warn};
 
-use crate::{command::ClientCommand, communicator::CommunicatorCommand, store::Store};
+use crate::{
+    DEFAULT_SAVE_PATH, command::ClientCommand, communicator::CommunicatorCommand, store::Store,
+};
 
 #[derive(Debug, Clone)]
 pub struct ControllerState {
@@ -39,8 +42,15 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
         client_cmd_broadcast_tx,
     } = arg;
 
+    let mut interval = interval_at(Instant::now(), Duration::from_secs(10));
+
     loop {
         select! {
+            _ = interval.tick() => {
+                if let Err(e) = store.save(DEFAULT_SAVE_PATH).await {
+                    warn!("Failed to save file: {:?}", e);
+                }
+            }
             Some(cmd) = cmd_rx.recv() => {
                 match cmd {
                     ControllerCommand::ChangeContext { context: new_context } => {
@@ -92,9 +102,6 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                     }
                 }
             }
-
         }
     }
-
-    // TODO:
 }

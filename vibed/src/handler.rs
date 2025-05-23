@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use axum::{
     extract::{
@@ -9,7 +9,7 @@ use axum::{
 };
 use tokio::{
     select,
-    sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
+    sync::{broadcast, mpsc, watch},
 };
 use tracing::info;
 
@@ -24,8 +24,6 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct HandlerState {
-    pub name: Arc<AsyncRwLock<String>>,
-
     pub store: Store,
 
     pub tick_rx: watch::Receiver<(Option<usize>, usize)>,
@@ -53,7 +51,6 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
     info!("Client connected: {}", addr);
 
     let HandlerState {
-        name,
         store,
         mut tick_rx,
         mut connection_status_rx,
@@ -83,7 +80,6 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                             process(ProcessArg {
                                 cmd,
                                 socket: &mut socket,
-                                name: name.clone(),
                                 store: store.clone(),
                                 tick_rx: &tick_rx,
                                 ticker_cmd_tx: &ticker_cmd_tx,
@@ -135,7 +131,6 @@ async fn respond(socket: &mut WebSocket, cmd: ClientCommand) -> Result<(), axum:
 #[derive(Debug)]
 pub struct ProcessArg<'a> {
     cmd: ServerCommand,
-    name: Arc<AsyncRwLock<String>>,
     pub store: Store,
     socket: &'a mut WebSocket,
     tick_rx: &'a watch::Receiver<(Option<usize>, usize)>,
@@ -151,7 +146,6 @@ pub struct ProcessArg<'a> {
 async fn process(arg: ProcessArg<'_>) {
     let ProcessArg {
         cmd,
-        name,
         store,
         socket,
         tick_rx,
@@ -167,7 +161,7 @@ async fn process(arg: ProcessArg<'_>) {
     match cmd {
         // LYN: Misc
         ServerCommand::SetProjectName { name: new_name } => {
-            *name.write().await = new_name.clone();
+            *store.name.write().await = new_name.clone();
             client_cmd_broadcast_tx
                 .send(ClientCommand::ProjectNameUpdated { name: new_name })
                 .unwrap();
@@ -475,7 +469,7 @@ async fn process(arg: ProcessArg<'_>) {
             respond(
                 socket,
                 ClientCommand::ResponseProjectName {
-                    name: name.read().await.clone(),
+                    name: store.name.read().await.clone(),
                 },
             )
             .await

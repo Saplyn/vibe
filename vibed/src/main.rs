@@ -28,6 +28,7 @@ const VIBED_SERVER_ADDR: &str = "0.0.0.0:8000";
 const DEFAULT_BPM: f32 = 120.0;
 const DEFAULT_NAME: &str = "Unnamed";
 const DEFAULT_TARGET_ADDR: &str = "127.0.0.1:3000";
+static DEFAULT_SAVE_PATH: &str = "./vibe-store.json";
 
 #[tokio::main]
 async fn main() {
@@ -35,7 +36,7 @@ async fn main() {
         .with_env_filter(EnvFilter::new("vibed=trace"))
         .init();
 
-    let store = Store::load();
+    let store = Store::load(DEFAULT_SAVE_PATH);
     let state = init_state(store.clone());
     let router = Router::new().route("/", get(ws_upgrader)).with_state(state);
     let listener = tokio::net::TcpListener::bind(VIBED_SERVER_ADDR)
@@ -59,11 +60,11 @@ fn init_state(store: Store) -> HandlerState {
     };
     let ticker_state = TickerState {
         patterns: store.patterns.clone(),
-        bpm: Arc::new(AsyncRwLock::new(DEFAULT_BPM)),
+        bpm: store.bpm.clone(),
         playing: Arc::new(AsyncRwLock::new(false)),
     };
     let communicator_state = CommunicatorState {
-        target_addr: Arc::new(AsyncRwLock::new(DEFAULT_TARGET_ADDR.to_string())),
+        target_addr: store.target_addr.clone(),
         connected: Arc::new(AsyncRwLock::new(false)),
     };
 
@@ -108,7 +109,6 @@ fn init_state(store: Store) -> HandlerState {
 
     // LYN: Construct App State
     HandlerState {
-        name: Arc::new(AsyncRwLock::new(DEFAULT_NAME.to_string())),
         store,
         tick_rx,
         connection_status_rx,
@@ -141,11 +141,11 @@ async fn shutdown_signal(store: Store) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => graceful_shutdown(store),
-        _ = terminate => graceful_shutdown(store),
+        _ = ctrl_c => graceful_shutdown(store).await,
+        _ = terminate => graceful_shutdown(store).await,
     }
 }
 
-fn graceful_shutdown(store: Store) {
-    println!("shutdown");
+async fn graceful_shutdown(store: Store) {
+    store.save(DEFAULT_SAVE_PATH).await.unwrap();
 }

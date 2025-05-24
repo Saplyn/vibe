@@ -2,9 +2,9 @@ name: Build `vibe` & `vibed`
 
 on:
   push:
-    branches: [ "release" ]
+    branches: ["release"]
   pull_request:
-    branches: [ "release" ]
+    branches: ["release"]
   workflow_dispatch:
 
 env:
@@ -19,14 +19,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest' # for Intel based macs.
-            args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
-            args: ''
-          - platform: 'windows-latest'
-            args: ''
+          - name: "macos-aarch64"
+            platform: "macos-latest"
+            target: "aarch64-apple-darwin" # for Arm based macs (M1 and above).
+            binary: "vibed"
+            bundles: ["dmg/vibe_0.1.0_aarch64.dmg"]
+
+          - name: "macos-x86_64"
+            platform: "macos-latest"
+            target: "x86_64-apple-darwin" # for Intel based macs.
+            binary: "vibed"
+            bundles: ["dmg/vibe_0.1.0_x86_64.dmg"]
+
+          - name: "linux"
+            platform: "ubuntu-22.04"
+            target: "x86_64-unknown-linux-gnu"
+            binary: "vibed"
+            bundles:
+              [
+                "deb/vibe_0.1.0_amd64.deb",
+                "rpm/vibe-0.1.0-1.x86_64.rpm",
+                "appimage/vibe_0.1.0_amd64.AppImage",
+              ]
+
+          - name: "windows"
+            platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            binary: "vibed.exe"
+            bundles:
+              ["msi/vibe_0.1.0_x64_en-US.msi", "nsis/vibe_0.1.0_x64-setup.exe"]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -41,16 +62,13 @@ jobs:
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
-      - name: Install Dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
+      - name: Install Dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-        # webkitgtk 4.0 is for Tauri v1 - webkitgtk 4.1 is for Tauri v2.
-        # You can remove the one that doesn't apply to your app to speed up the workflow a bit.
 
       - name: Install Frontend Dependencies
         working-directory: vibe
@@ -58,20 +76,20 @@ jobs:
 
       - name: Build Frontend `vibe`
         working-directory: vibe
-        run: bun run tauri build
+        run: bun run tauri build --target ${{ matrix.target }}
 
       - name: Build Backend `vibed`
         working-directory: vibed
-        run: cargo build --release
-        
+        run: cargo build --release --target ${{ matrix.target }}
+
       - name: Upload Frontend Artifact `vibe`
         uses: actions/upload-artifact@v4
         with:
-          name: vibe-${{ matrix.platform }}
-          path: vibe/src-tauri/target/release/bundle/
+          name: vibe-${{ matrix.name }}
+          path: vibe/src-tauri/target/release/bundle/${{ matrix.bundles }}
 
       - name: Upload Backend Artifact `vibed`
         uses: actions/upload-artifact@v4
         with:
-          name: vibed-${{ matrix.platform }}
-          path: vibed/target/release/vibed*
+          name: vibed-${{ matrix.name }}
+          path: vibed/target/release/${{ matrix.binary }}

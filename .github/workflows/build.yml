@@ -67,11 +67,11 @@ jobs:
       - name: Upload Frontend Artifact `vibe`
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-${{ matrix.os }}
+          name: vibe-${{ matrix.platform }}
           path: vibe/src-tauri/target/release/bundle/
 
       - name: Upload Backend Artifact `vibed`
         uses: actions/upload-artifact@v4
         with:
-          name: backend-${{ matrix.os }}
+          name: vibed-${{ matrix.platform }}
           path: vibed/target/release/vibed*

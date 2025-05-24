@@ -39,10 +39,19 @@
             v-for="event in events"
           >
             <Button
-              class="min-h-10 grow rounded-b-none font-mono text-xl"
-              :label="event.name"
+              class="min-h-10 grow rounded-b-none"
               @click="fireEvent(event.name)"
-            />
+            >
+              <div class="flex flex-col font-mono">
+                <div class="pt-2 text-xl">{{ event.name }}</div>
+                <kbd
+                  class="border-primary-500 rounded-lg border-2"
+                  v-if="event.shortcut != null && event.shortcut != ''"
+                >
+                  {{ event.shortcut }}
+                </kbd>
+              </div>
+            </Button>
 
             <Button
               @click="toggleEventPopover($event, event.name)"
@@ -150,9 +159,15 @@
     <!-- LYN: Edit Event -->
     <Popover ref="eventPopover">
       <div class="flex flex-col gap-2">
+        <FloatLabel variant="on">
+          <InputText v-model="eventEditing!.shortcut" />
+          <label>Shortcut</label>
+        </FloatLabel>
+
         <SelectButton
           v-model="eventEditing!.payload.type"
           :options="eventTypeOpts"
+          class="flex items-center justify-center"
         >
           <template #option="slotProps">
             <span class="material-symbols-rounded">
@@ -207,6 +222,7 @@
         </div>
       </div>
     </Popover>
+    <div>{{ shortcutKeys }}</div>
   </BlockUI>
 </template>
 
@@ -372,5 +388,27 @@ function delEventWrapper(name?: string) {
   }
   eventPopover.value.toggle(false);
   delEvent(name);
+  set(eventEditing, undefined);
 }
+
+// LYN: Event Shortcut
+const shortcutKeys = computed(() => {
+  return Object.values(get(events) ?? {}).map((event) => event.shortcut);
+});
+onKeyStroke(
+  (_: KeyboardEvent) => {
+    return true;
+  },
+  (e) => {
+    if (get(connected)) {
+      const event = Object.values(get(events) ?? {}).find(
+        (event) => event.shortcut === e.key,
+      );
+      if (event) {
+        fireEvent(event.name);
+      }
+    }
+  },
+  { dedupe: true },
+);
 </script>

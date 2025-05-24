@@ -2,21 +2,10 @@
 
 ## Features
 
-Live connectivity check
-
-![Connectivity](./assets/connectivity.mp4)
-
-Track Composing & on-beat on-off
-
-![Track Composing](./assets/tracks.mp4)
-
-Pattern Based Programming
-
-![Pattern Based Programming](./assets/patterns.mp4)
-
-One-off events & numerical slider
-
-![One-off Events & Slider](./assets/controls.mp4)
+- [Live connectivity check](./assets/connectivity.mp4)
+- [Track Composing & on-beat on-off](./assets/tracks.mp4)
+- [Pattern based programming](./assets/patterns.mp4)
+- [One-off events & numerical slider](./assets/controls.png)
 
 ## Using The App
 

@@ -5,7 +5,7 @@ use tokio::sync::RwLock as AsyncRwLock;
 
 use crate::{
     DEFAULT_BPM, DEFAULT_NAME, DEFAULT_TARGET_ADDR,
-    models::{Pattern, Track},
+    models::{Event, Pattern, Slider, Track},
 };
 
 #[derive(Debug, Clone)]
@@ -15,6 +15,8 @@ pub struct Store {
     pub target_addr: Arc<AsyncRwLock<String>>,
     pub patterns: Arc<AsyncRwLock<HashMap<String, Pattern>>>,
     pub tracks: Arc<AsyncRwLock<HashMap<String, Track>>>,
+    pub events: Arc<AsyncRwLock<HashMap<String, Event>>>,
+    pub sliders: Arc<AsyncRwLock<HashMap<String, Slider>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +26,8 @@ pub struct StrippedStore {
     pub target_addr: String,
     pub patterns: HashMap<String, Pattern>,
     pub tracks: HashMap<String, Track>,
+    pub events: HashMap<String, Event>,
+    pub sliders: HashMap<String, Slider>,
 }
 
 impl From<StrippedStore> for Store {
@@ -34,6 +38,8 @@ impl From<StrippedStore> for Store {
             target_addr: Arc::new(AsyncRwLock::new(val.target_addr)),
             patterns: Arc::new(AsyncRwLock::new(val.patterns)),
             tracks: Arc::new(AsyncRwLock::new(val.tracks)),
+            events: Arc::new(AsyncRwLock::new(val.events)),
+            sliders: Arc::new(AsyncRwLock::new(val.sliders)),
         }
     }
 }
@@ -46,6 +52,8 @@ impl Default for Store {
             target_addr: Arc::new(AsyncRwLock::new(DEFAULT_TARGET_ADDR.to_string())),
             patterns: Default::default(),
             tracks: Default::default(),
+            events: Default::default(),
+            sliders: Default::default(),
         }
     }
 }
@@ -87,6 +95,8 @@ impl Store {
             target_addr: self.target_addr.read().await.clone(),
             patterns: self.patterns.read().await.clone(),
             tracks: self.tracks.read().await.clone(),
+            events: self.events.read().await.clone(),
+            sliders: self.sliders.read().await.clone(),
         }
     }
 }

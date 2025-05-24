@@ -49,7 +49,7 @@ import {
 } from "vue";
 import { get, set, useWebSocket } from "@vueuse/core";
 import { ClientCommand, ServerCommand } from "./types/command";
-import { Pattern, Track } from "./types/models";
+import { Pattern, Track, Event, Slider } from "./types/models";
 import { useToast } from "primevue/usetoast";
 import { info } from "@tauri-apps/plugin-log";
 
@@ -234,6 +234,109 @@ watch([cmd, watchableResp], ([cmd, _]) => {
   }
 });
 
+// LYN: Events
+
+const events = ref<Record<string, Event>>();
+const addEvent = (name: string) =>
+  send({ action: "EventAdd", payload: { name } });
+const delEvent = (name: string) =>
+  send({ action: "EventDelete", payload: { name } });
+const editEvent = (name: string, event: Event) =>
+  send({ action: "EventEdit", payload: { name, event } });
+const fireEvent = (name: string) =>
+  send({ action: "EventFire", payload: { name } });
+export type EventState = {
+  events: DeepReadonly<
+    UnwrapNestedRefs<Ref<Record<string, Event> | undefined>>
+  >;
+  addEvent: (name: string) => void;
+  delEvent: (name: string) => void;
+  editEvent: (name: string, event: Event) => void;
+  fireEvent: (name: string) => void;
+};
+provide<EventState>("event-state", {
+  events: readonly(events),
+  addEvent,
+  delEvent,
+  editEvent,
+  fireEvent,
+});
+watch([cmd, watchableResp], ([cmd, _]) => {
+  switch (cmd!.action) {
+    case "EventAdded":
+      set(events, {
+        ...get(events),
+        [cmd.payload.name]: cmd.payload.event,
+      });
+      break;
+    case "EventDeleted":
+      const newEvents = { ...get(events) };
+      delete newEvents[cmd.payload.name];
+      set(events, newEvents);
+      break;
+    case "EventEdited":
+      set(events, {
+        ...get(events),
+        [cmd.payload.name]: cmd.payload.event,
+      });
+      break;
+  }
+});
+
+// LYN: Sliders
+
+const sliders = ref<Record<string, Slider>>();
+const addSlider = (name: string) =>
+  send({ action: "SliderAdd", payload: { name } });
+const delSlider = (name: string) =>
+  send({ action: "SliderDelete", payload: { name } });
+const editSlider = (name: string, slider: Slider) =>
+  send({ action: "SliderEdit", payload: { name, slider } });
+const setSliderVal = (name: string, val: number) =>
+  send({ action: "SliderSetVal", payload: { name, val } });
+export type SliderState = {
+  sliders: DeepReadonly<
+    UnwrapNestedRefs<Ref<Record<string, Slider> | undefined>>
+  >;
+  addSlider: (name: string) => void;
+  delSlider: (name: string) => void;
+  editSlider: (name: string, slider: Slider) => void;
+  setSliderVal: (name: string, val: number) => void;
+};
+provide<SliderState>("slider-state", {
+  sliders: readonly(sliders),
+  addSlider,
+  delSlider,
+  editSlider,
+  setSliderVal,
+});
+watch([cmd, watchableResp], ([cmd, _]) => {
+  switch (cmd!.action) {
+    case "SliderAdded":
+      set(sliders, {
+        ...get(sliders),
+        [cmd.payload.name]: cmd.payload.slider,
+      });
+      break;
+    case "SliderDeleted":
+      const newSliders = { ...get(sliders) };
+      delete newSliders[cmd.payload.name];
+      set(sliders, newSliders);
+      break;
+    case "SliderEdited":
+      set(sliders, {
+        ...get(sliders),
+        [cmd.payload.name]: cmd.payload.slider,
+      });
+      break;
+    case "SliderValSet":
+      const newSlidersVal = { ...get(sliders) };
+      newSlidersVal[cmd.payload.name].val = cmd.payload.val;
+      set(sliders, newSlidersVal);
+      break;
+  }
+});
+
 // LYN: Pattern Editing
 const patternName = ref<string>();
 const changeEditing = (name: string | null) =>
@@ -344,6 +447,12 @@ watch([cmd, watchableResp], ([cmd, _]) => {
     case "ResponseAllPatterns":
       set(patterns, cmd.payload.patterns);
       break;
+    case "ResponseAllEvents":
+      set(events, cmd.payload.events);
+      break;
+    case "ResponseAllSliders":
+      set(sliders, cmd.payload.sliders);
+      break;
   }
 });
 watch(connected, async (connected) => {
@@ -353,12 +462,16 @@ watch(connected, async (connected) => {
     send({ action: "RequestCommStatus" });
     send({ action: "RequestAllTracks" });
     send({ action: "RequestAllPatterns" });
+    send({ action: "RequestAllEvents" });
+    send({ action: "RequestAllSliders" });
   } else {
     set(projectName, undefined);
     set(commAddr, undefined);
     set(established, undefined);
     set(tracks, undefined);
     set(patterns, undefined);
+    set(events, undefined);
+    set(sliders, undefined);
   }
 });
 </script>

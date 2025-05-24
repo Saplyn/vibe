@@ -157,3 +157,47 @@ impl Track {
         }
     }
 }
+
+// LYN: Event
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Event {
+    pub name: String,
+    pub path: String,
+    pub shortcut: Option<String>,
+    pub payload: MinOscArg,
+}
+
+impl Event {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            path: String::from("/"),
+            shortcut: None,
+            payload: MinOscArg::default(),
+        }
+    }
+}
+
+// LYN: Slider
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Slider {
+    pub name: String,
+    pub path: String,
+    pub val: f32,
+    pub max: f32,
+    pub min: f32,
+}
+
+impl Slider {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            path: String::from("/"),
+            val: 0.0,
+            max: 1.0,
+            min: 0.0,
+        }
+    }
+}

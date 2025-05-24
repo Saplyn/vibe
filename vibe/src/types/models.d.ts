@@ -21,11 +21,26 @@ export type Track = {
   patterns: string[];
 };
 
+export type Event = {
+  name: string;
+  path: string;
+  shortcut: string | null;
+  payload: MinOscArg;
+};
+
+export type Slider = {
+  name: string;
+  path: string;
+  val: number;
+  max: number;
+  min: number;
+};
+
 export type MinOscMessage = {
   path: string;
   arg: MinOscArg;
 };
 
-type MinOscArg =
+export type MinOscArg =
   | { type: "Float"; value: number }
   | { type: "String"; value: string };

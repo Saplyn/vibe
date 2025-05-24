@@ -1,4 +1,4 @@
-import { Track, Pattern } from "./models";
+import { Track, Pattern, Slider, Event } from "./models";
 
 export type ServerCommand =
   | { action: "SetProjectName"; payload: { name: string } }
@@ -22,6 +22,16 @@ export type ServerCommand =
   | { action: "TickerPause" }
   | { action: "TickerStop" }
   | { action: "TickerSetBpm"; payload: { bpm: number } }
+  // LYN: Event
+  | { action: "EventAdd"; payload: { name: string } }
+  | { action: "EventDelete"; payload: { name: string } }
+  | { action: "EventEdit"; payload: { name: string; event: Event } }
+  | { action: "EventFire"; payload: { name: string } }
+  // LYN: Slider
+  | { action: "SliderAdd"; payload: { name: string } }
+  | { action: "SliderDelete"; payload: { name: string } }
+  | { action: "SliderEdit"; payload: { name: string; slider: Slider } }
+  | { action: "SliderSetVal"; payload: { name: string; val: number } }
   // LYN: Request
   | { action: "RequestTickerBpm" }
   | { action: "RequestTickerPlaying" }
@@ -30,10 +40,10 @@ export type ServerCommand =
   | { action: "RequestCommAddr" }
   | { action: "RequestCommStatus" }
   | { action: "RequestCtrlContext" }
-  | { action: "RequestTrack"; payload: { name: string } }
   | { action: "RequestAllTracks" }
-  | { action: "RequestPattern"; payload: { name: string } }
-  | { action: "RequestAllPatterns" };
+  | { action: "RequestAllPatterns" }
+  | { action: "RequestAllEvents" }
+  | { action: "RequestAllSliders" };
 
 export type ClientCommand =
   | { action: "ProjectNameUpdated"; payload: { name: string } }
@@ -54,6 +64,15 @@ export type ClientCommand =
   | { action: "PatternAdded"; payload: { name: string; pattern: Pattern } }
   | { action: "PatternDeleted"; payload: { name: string } }
   | { action: "PatternEdited"; payload: { name: string; pattern: Pattern } }
+  // LYN: Event
+  | { action: "EventAdded"; payload: { name: string; event: Event } }
+  | { action: "EventDeleted"; payload: { name: string } }
+  | { action: "EventEdited"; payload: { name: string; event: Event } }
+  // LYN: Slider
+  | { action: "SliderAdded"; payload: { name: string; slider: Slider } }
+  | { action: "SliderDeleted"; payload: { name: string } }
+  | { action: "SliderEdited"; payload: { name: string; slider: Slider } }
+  | { action: "SliderValSet"; payload: { name: string; val: number } }
   // LYN: Ticker
   | { action: "TickerPlaying" }
   | { action: "TickerPaused" }
@@ -68,12 +87,15 @@ export type ClientCommand =
   | { action: "ResponseCommAddr"; payload: { addr: string } }
   | { action: "ResponseCommStatus"; payload: { established: boolean } }
   | { action: "ResponseCtrlContext"; payload: { context: string | null } }
-  | { action: "ResponseTrack"; payload: { name: string; track: Track } }
   | { action: "ResponseAllTracks"; payload: { tracks: Record<string, Track> } }
-  | { action: "ResponsePattern"; payload: { name: string; pattern: Pattern } }
   | {
       action: "ResponseAllPatterns";
       payload: { patterns: Record<string, Pattern> };
+    }
+  | { action: "ResponseAllEvents"; payload: { events: Record<string, Event> } }
+  | {
+      action: "ResponseAllSliders";
+      payload: { sliders: Record<string, Slider> };
     }
   | {
       action: "Notify";

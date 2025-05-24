@@ -16,7 +16,7 @@ pub enum MinOscArg {
 
 impl Default for MinOscArg {
     fn default() -> Self {
-        MinOscArg::String("/".to_string())
+        MinOscArg::String(String::new())
     }
 }
 

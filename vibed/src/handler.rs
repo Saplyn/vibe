@@ -11,13 +11,14 @@ use tokio::{
     select,
     sync::{broadcast, mpsc, watch},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     command::{ClientCommand, ServerCommand, Severity},
     communicator::{CommunicatorCommand, CommunicatorState},
     controller::{ControllerCommand, ControllerState},
-    models::{Pattern, Track},
+    models::{Event, Pattern, Slider, Track},
+    mosc::{MinOscArg, MinOscMessage},
     store::Store,
     ticker::{TickerCommand, TickerState},
 };
@@ -75,7 +76,10 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                 if let Ok(msg) = msg {
                     match msg {
                         Message::Text(cmd) => {
-                            let cmd: ServerCommand = serde_json::from_str(&cmd).unwrap();
+                            let Ok(cmd) = serde_json::from_str::<ServerCommand>(&cmd) else {
+                                warn!("Failed to parse command: {:?}", cmd);
+                                continue;
+                            };
                             info!("get messages: {:?}", cmd);
                             process(ProcessArg {
                                 cmd,
@@ -395,6 +399,182 @@ async fn process(arg: ProcessArg<'_>) {
                 .unwrap();
             }
         }
+        // LYN: Event
+        ServerCommand::EventAdd { name } => {
+            let mut events = store.events.write().await;
+            if events.get(&name).is_some() {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Add Event".to_string(),
+                        detail: format!("Event with name \"{}\" already exists", name),
+                    },
+                )
+                .await
+                .unwrap();
+            } else {
+                let event = Event::new(name.clone());
+                events.insert(name.clone(), event.clone());
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::EventAdded { name, event })
+                    .unwrap();
+            }
+        }
+        ServerCommand::EventDelete { name } => {
+            let mut events = store.events.write().await;
+            if events.remove(&name).is_some() {
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::EventDeleted { name })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Delete Event".to_string(),
+                        detail: format!("Event with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::EventEdit { name, event } => {
+            let mut events = store.events.write().await;
+            if let Some(existing_event) = events.get_mut(&name) {
+                *existing_event = event.clone();
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::EventEdited { name, event })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Edit Event".to_string(),
+                        detail: format!("Event with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::EventFire { name } => {
+            let events = store.events.read().await;
+            let Some(event) = events.get(&name) else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Fire Event".to_string(),
+                        detail: format!("Event with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+                return;
+            };
+            communicator_cmd_tx
+                .send(CommunicatorCommand::SendMessage {
+                    msg: MinOscMessage {
+                        path: event.path.clone(),
+                        arg: event.payload.clone(),
+                    },
+                })
+                .await
+                .unwrap();
+        }
+        // LYN: Slider
+        ServerCommand::SliderAdd { name } => {
+            let mut sliders = store.sliders.write().await;
+            if sliders.get(&name).is_some() {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Add Slider".to_string(),
+                        detail: format!("Slider with name \"{}\" already exists", name),
+                    },
+                )
+                .await
+                .unwrap();
+            } else {
+                let slider = Slider::new(name.clone());
+                sliders.insert(name.clone(), slider.clone());
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::SliderAdded { name, slider })
+                    .unwrap();
+            }
+        }
+        ServerCommand::SliderDelete { name } => {
+            let mut sliders = store.sliders.write().await;
+            if sliders.remove(&name).is_some() {
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::SliderDeleted { name })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Delete Slider".to_string(),
+                        detail: format!("Slider with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::SliderEdit { name, slider } => {
+            let mut sliders = store.sliders.write().await;
+            if let Some(existing_slider) = sliders.get_mut(&name) {
+                *existing_slider = slider.clone();
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::SliderEdited { name, slider })
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Edit Slider".to_string(),
+                        detail: format!("Slider with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
+        ServerCommand::SliderSetVal { name, val } => {
+            let mut sliders = store.sliders.write().await;
+            if let Some(slider) = sliders.get_mut(&name) {
+                slider.val = val;
+                client_cmd_broadcast_tx
+                    .send(ClientCommand::SliderValSet { name, val })
+                    .unwrap();
+                communicator_cmd_tx
+                    .send(CommunicatorCommand::SendMessage {
+                        msg: MinOscMessage {
+                            path: slider.path.clone(),
+                            arg: MinOscArg::Float(val),
+                        },
+                    })
+                    .await
+                    .unwrap();
+            } else {
+                respond(
+                    socket,
+                    ClientCommand::Notify {
+                        severity: Severity::Error,
+                        summary: "Failed to Set Slider Value".to_string(),
+                        detail: format!("Slider with name \"{}\" does not exist", name),
+                    },
+                )
+                .await
+                .unwrap();
+            }
+        }
         // LYN: Ticker
         ServerCommand::TickerPlay => {
             ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
@@ -505,31 +685,6 @@ async fn process(arg: ProcessArg<'_>) {
             .await
             .unwrap();
         }
-        ServerCommand::RequestTrack { name } => {
-            let tracks = store.tracks.read().await;
-            if let Some(track) = tracks.get(&name) {
-                respond(
-                    socket,
-                    ClientCommand::ResponseTrack {
-                        name: name.clone(),
-                        track: track.clone(),
-                    },
-                )
-                .await
-                .unwrap();
-            } else {
-                respond(
-                    socket,
-                    ClientCommand::Notify {
-                        severity: Severity::Error,
-                        summary: "Failed to Request Track".to_string(),
-                        detail: format!("Track with name \"{}\" does not exist", name),
-                    },
-                )
-                .await
-                .unwrap();
-            }
-        }
         ServerCommand::RequestAllPatterns => {
             respond(
                 socket,
@@ -540,36 +695,31 @@ async fn process(arg: ProcessArg<'_>) {
             .await
             .unwrap();
         }
-        ServerCommand::RequestPattern { name } => {
-            let patterns = store.patterns.read().await;
-            if let Some(pattern) = patterns.get(&name) {
-                respond(
-                    socket,
-                    ClientCommand::ResponsePattern {
-                        name: name.clone(),
-                        pattern: pattern.clone(),
-                    },
-                )
-                .await
-                .unwrap();
-            } else {
-                respond(
-                    socket,
-                    ClientCommand::Notify {
-                        severity: Severity::Error,
-                        summary: "Failed to Request Pattern".to_string(),
-                        detail: format!("Pattern with name \"{}\" does not exist", name),
-                    },
-                )
-                .await
-                .unwrap();
-            }
-        }
         ServerCommand::RequestCtrlContext => {
             respond(
                 socket,
                 ClientCommand::ResponseCtrlContext {
                     context: controller_state.context.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestAllEvents => {
+            respond(
+                socket,
+                ClientCommand::ResponseAllEvents {
+                    events: store.events.read().await.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        ServerCommand::RequestAllSliders => {
+            respond(
+                socket,
+                ClientCommand::ResponseAllSliders {
+                    sliders: store.sliders.read().await.clone(),
                 },
             )
             .await

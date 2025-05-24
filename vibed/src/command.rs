@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Pattern, Track};
+use crate::models::{Event, Pattern, Slider, Track};
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +24,16 @@ pub enum ServerCommand {
     PatternDelete { name: String },
     PatternEdit { name: String, pattern: Pattern },
 
+    EventAdd { name: String },
+    EventDelete { name: String },
+    EventEdit { name: String, event: Event },
+    EventFire { name: String },
+
+    SliderAdd { name: String },
+    SliderDelete { name: String },
+    SliderEdit { name: String, slider: Slider },
+    SliderSetVal { name: String, val: f32 },
+
     TickerPlay,
     TickerPause,
     TickerStop,
@@ -36,10 +46,10 @@ pub enum ServerCommand {
     RequestCommAddr,
     RequestCommStatus,
     RequestCtrlContext,
-    RequestTrack { name: String },
     RequestAllTracks,
-    RequestPattern { name: String },
     RequestAllPatterns,
+    RequestAllEvents,
+    RequestAllSliders,
 }
 
 #[rustfmt::skip]
@@ -58,11 +68,20 @@ pub enum ClientCommand {
     TrackEdited { name: String, track: Track },
     TrackMadeActive { name: String, active: bool },
     TrackMadeLoop { name: String, r#loop: bool },
+    TrackProgressUpdate { name: String, progress: Option<usize> },
 
     PatternAdded { name: String, pattern: Pattern },
     PatternDeleted { name: String },
     PatternEdited { name: String, pattern: Pattern },
-    TrackProgressUpdate { name: String, progress: Option<usize> },
+
+    EventAdded { name: String, event: Event },
+    EventDeleted { name: String },
+    EventEdited { name: String, event: Event },
+
+    SliderAdded { name: String, slider: Slider },
+    SliderDeleted { name: String },
+    SliderEdited { name: String, slider: Slider },
+    SliderValSet { name: String, val: f32 },
 
     TickerPlaying,
     TickerPaused,
@@ -77,10 +96,10 @@ pub enum ClientCommand {
     ResponseCommAddr { addr: String },
     ResponseCommStatus { established: bool },
     ResponseCtrlContext { context: Option<String> },
-    ResponseTrack { name: String, track: Track },
     ResponseAllTracks { tracks: HashMap<String, Track> },
-    ResponsePattern { name: String, pattern: Pattern },
     ResponseAllPatterns { patterns: HashMap<String, Pattern> },
+    ResponseAllEvents { events: HashMap<String, Event> },
+    ResponseAllSliders { sliders: HashMap<String, Slider> },
 
     Notify { severity: Severity, summary: String, detail: String },
 }

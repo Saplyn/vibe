@@ -72,7 +72,7 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                     for msg in pattern.get_osc_messages(tick) {
                         communicator_cmd_tx.send(CommunicatorCommand::SendMessage { msg })
                             .await
-                            .unwrap();
+                            .expect("Communicator panicked!");
                     }
                 } else {
                     let mut tracks = store.tracks.write().await;
@@ -84,21 +84,25 @@ pub async fn main(state: ControllerState, arg: ControllerArg) {
                                 .await
                         );
 
-                        client_cmd_broadcast_tx.send(ClientCommand::TrackProgressUpdate {
+                        if let Err(err) = client_cmd_broadcast_tx.send(ClientCommand::TrackProgressUpdate {
                             name: track.name.clone(),
                             progress: track.progress,
-                        }).unwrap();
+                        }) {
+                            warn!("Failed to broadcast client command: {}", err);
+                        };
                         if !track.active {
-                            client_cmd_broadcast_tx.send(ClientCommand::TrackMadeActive {
+                            if let Err(err) =client_cmd_broadcast_tx.send(ClientCommand::TrackMadeActive {
                                 name: track.name.clone(),
                                 active: false,
-                            }).unwrap();
+                            }) {
+                            warn!("Failed to broadcast client command: {}", err);
+                        };
                         }
                     }
                     for msg in msgs.iter().flatten() {
                         communicator_cmd_tx.send(CommunicatorCommand::SendMessage {
                             msg: msg.clone()
-                        }).await.unwrap();
+                        }).await.expect("Communicator panicked!");
                     }
                 }
             }

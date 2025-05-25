@@ -42,7 +42,6 @@ impl Pattern {
     pub fn get_osc_messages(&self, tick: usize) -> Vec<MinOscMessage> {
         let (page, index) = (tick / PAGE_SIZE, tick % PAGE_SIZE);
         if page >= self.page_count {
-            error!("page {page} >= count {}", self.page_count);
             return vec![];
         }
 
@@ -127,7 +126,6 @@ impl Track {
             }
         }
 
-        error!("track playable");
         let Some(mut progress) = self.progress else {
             unreachable!()
         };

@@ -127,8 +127,20 @@
           <Divider layout="vertical" />
 
           <!-- LYN: Edit Control -->
+          <ToggleButton
+            on-label="Live"
+            off-label="Manual"
+            v-model="liveEditing"
+            :pt:content="
+              (opt: any) => ({
+                class: opt.context.active
+                  ? 'bg-primary text-primary-contrast'
+                  : '',
+              })
+            "
+          />
           <Button
-            :disabled="!dirty || !validMessages"
+            :disabled="!dirty || !validMessages || liveEditing"
             :variant="
               editingName != undefined && dirty && validMessages
                 ? ''
@@ -214,6 +226,7 @@ import { get, onKeyStroke, set, useFocus } from "@vueuse/core";
 import { ButtonGroup, useConfirm } from "primevue";
 import { Pattern } from "../types/models";
 import { cloneDeep, isEqual } from "lodash";
+import { info } from "@tauri-apps/plugin-log";
 
 const programPanes = [
   { value: "midi", icon: "piano" },
@@ -379,4 +392,12 @@ function addNewMessage() {
     },
   });
 }
+
+// LYN: Live Edit
+const liveEditing = ref(false);
+watch(dirty, () => {
+  if (get(liveEditing) && get(dirty) && get(validMessages)) {
+    makeEdit();
+  }
+});
 </script>

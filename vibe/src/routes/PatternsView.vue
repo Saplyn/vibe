@@ -226,7 +226,6 @@ import { get, onKeyStroke, set, useFocus } from "@vueuse/core";
 import { ButtonGroup, useConfirm } from "primevue";
 import { Pattern } from "../types/models";
 import { cloneDeep, isEqual } from "lodash";
-import { info } from "@tauri-apps/plugin-log";
 
 const programPanes = [
   { value: "midi", icon: "piano" },

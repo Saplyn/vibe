@@ -26,6 +26,7 @@ jobs:
             bundles: |
               vibe/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
               vibe/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
+              vibe/src-tauri/target/release/vibe
 
           - name: macos-x86_64
             platform: macos-latest
@@ -34,6 +35,7 @@ jobs:
             bundles: |
               vibe/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
               vibe/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app
+              vibe/src-tauri/target/release/vibe
 
           - name: linux
             platform: ubuntu-22.04
@@ -43,6 +45,7 @@ jobs:
               vibe/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
               vibe/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
               vibe/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+              vibe/src-tauri/target/release/vibe
 
           - name: windows
             platform: windows-latest
@@ -51,6 +54,7 @@ jobs:
             bundles: |
               vibe/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
               vibe/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+              vibe/src-tauri/target/release/vibe.exe
 
     runs-on: ${{ matrix.platform }}
     steps:

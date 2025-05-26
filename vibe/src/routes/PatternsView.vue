@@ -99,12 +99,23 @@
 
           <!-- LYN: Page Control -->
           <Button
-            :disabled="notEditing || startingPage === 0"
-            @click="startingPage--"
+            :disabled="notEditing || startingPage < 4"
+            @click="startingPage -= 4"
           >
             <template #icon>
               <span class="material-symbols-rounded">
                 keyboard_double_arrow_left
+              </span>
+            </template>
+          </Button>
+
+          <Button
+            :disabled="notEditing || startingPage <= 0"
+            @click="startingPage--"
+          >
+            <template #icon>
+              <span class="material-symbols-rounded">
+                keyboard_arrow_left
               </span>
             </template>
           </Button>
@@ -116,6 +127,19 @@
           <Button
             :disabled="notEditing || startingPage >= patternEditing!.page_count"
             @click="startingPage++"
+          >
+            <template #icon>
+              <span class="material-symbols-rounded">
+                keyboard_arrow_right
+              </span>
+            </template>
+          </Button>
+
+          <Button
+            :disabled="
+              notEditing || startingPage + 3 >= patternEditing!.page_count
+            "
+            @click="startingPage += 4"
           >
             <template #icon>
               <span class="material-symbols-rounded">

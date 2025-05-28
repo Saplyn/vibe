@@ -17,6 +17,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+built = { version = "0.8", features = ["chrono"] }
 
 [dependencies]
 # Tauri Core
@@ -27,3 +28,5 @@ serde_json = "1"
 # Logging
 tauri-plugin-log = "2"
 log = "0.4"
+chrono = "0.4"
+owo-colors = "4.2"

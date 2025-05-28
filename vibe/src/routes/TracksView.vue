@@ -100,7 +100,11 @@
 
             <ProgressBar
               :value="getTrackProgressPercent(track.name)"
-              pt:value:class="duration-[0ms] bg-primary/60"
+              :pt:value:class="
+                trackIsEndding(track.name)
+                  ? 'duration-[0ms] bg-red-500/60'
+                  : 'duration-[0ms] bg-primary/60'
+              "
               pt:label:class="hidden"
             />
           </div>
@@ -434,5 +438,19 @@ function getTrackProgressPercent(name: string): number {
     return 100;
   }
   return (progress / (trackTickCount(name) ?? 0)) * 100;
+}
+function trackIsEndding(name: string): boolean {
+  let track = get(tracks)?.[name];
+  if (track == undefined) {
+    return false;
+  }
+  let progress = track.progress;
+  if (progress == undefined) {
+    return false;
+  }
+  if (progress == 0) {
+    return false;
+  }
+  return progress >= (trackTickCount(name) ?? 0) - 16;
 }
 </script>

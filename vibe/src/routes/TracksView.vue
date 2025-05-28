@@ -451,6 +451,6 @@ function trackIsEndding(name: string): boolean {
   if (progress == 0) {
     return false;
   }
-  return progress >= (trackTickCount(name) ?? 0) - 16;
+  return progress > (trackTickCount(name) ?? 0) - 16;
 }
 </script>

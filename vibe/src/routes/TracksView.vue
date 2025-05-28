@@ -90,6 +90,9 @@
                 v-else
                 v-for="pat in track.patterns"
                 class="dark:bg-surface-700 bg-surface-200 text-surface-500 dark:text-surface-400 flex grow items-center justify-center rounded-md font-mono text-lg"
+                :style="{
+                  flexBasis: `${Math.min(patternIsValidAndLength(pat) ?? 1, 100)}%`,
+                }"
               >
                 {{ pat }}({{ patternIsValidAndLength(pat) ?? "?" }})
               </div>

@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 
+[build-dependencies]
+built = { version = "0.8", features = ["chrono"] }
+
 [dependencies]
 # Server
 axum = { version = "0.8", features = ["ws"] }
@@ -15,5 +18,6 @@ futures = "0.3"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+owo-colors = "4.2"
 # OSC
 rosc = "0.11"

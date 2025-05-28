@@ -1,11 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use axum::{Router, routing::get};
-use communicator::{CommunicatorArg, CommunicatorState};
-use controller::{ControllerArg, ControllerState};
-use handler::{HandlerState, ws_upgrader};
-use store::Store;
-use ticker::{TickerArg, TickerState};
 use tokio::{
     signal, spawn,
     sync::{RwLock as AsyncRwLock, broadcast, mpsc, watch},
@@ -13,8 +8,15 @@ use tokio::{
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+use crate::build::print_built_info;
 use crate::command::ClientCommand;
+use crate::communicator::{CommunicatorArg, CommunicatorState};
+use crate::controller::{ControllerArg, ControllerState};
+use crate::handler::{HandlerState, ws_upgrader};
+use crate::store::Store;
+use crate::ticker::{TickerArg, TickerState};
 
+mod build;
 mod command;
 mod communicator;
 mod controller;
@@ -32,6 +34,7 @@ static DEFAULT_SAVE_PATH: &str = "./vibe-store.json";
 
 #[tokio::main]
 async fn main() {
+    print_built_info();
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::new("vibed=trace"))
         .init();

@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 
 use tokio::sync::RwLock as AsyncRwLock;
-use tracing::error;
 
 use crate::mosc::{MinOscArg, MinOscMessage};
 

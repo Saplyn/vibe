@@ -115,6 +115,11 @@ onMounted(async () => {
 
 // LYN: Patterns
 const patterns = ref<Record<string, Pattern>>();
+const sortedPatterns = computed(() => {
+  const entries = Object.entries(get(patterns) ?? {});
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return Object.fromEntries(entries) as Record<string, Pattern>;
+});
 const addPattern = (name: string) =>
   send({ action: "PatternAdd", payload: { name } });
 const delPattern = (name: string) =>
@@ -135,7 +140,7 @@ export type PatternState = {
   editPattern: (name: string, pattern: Pattern) => void;
 };
 provide<PatternState>("pattern-state", {
-  patterns: readonly(patterns),
+  patterns: readonly(sortedPatterns),
   addPattern,
   delPattern,
   editPattern,
@@ -167,6 +172,11 @@ watch([cmd, watchableResp], ([cmd, _]) => {
 
 // LYN: Tracks
 const tracks = ref<Record<string, Track>>();
+const sortedTracks = computed(() => {
+  const entries = Object.entries(get(tracks) ?? {});
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return Object.fromEntries(entries) as Record<string, Track>;
+});
 const addTrack = (name: string) =>
   send({ action: "TrackAdd", payload: { name } });
 const delTrack = (name: string) =>
@@ -190,7 +200,7 @@ export type TrackState = {
   makeTrackLoop: (name: string, loop: boolean) => void;
 };
 provide<TrackState>("track-state", {
-  tracks: readonly(tracks),
+  tracks: readonly(sortedTracks),
   addTrack,
   delTrack,
   editTrack,

@@ -3,7 +3,7 @@
     <div class="flex">
       <!-- LYN: Midi Quick Peek -->
       <div
-        class="text-primary/70 flex w-60 shrink-0 items-center justify-end pr-2 font-mono"
+        class="text-primary/70 flex w-70 shrink-0 items-center justify-end pr-2 font-mono"
       >
         Midi Peek
       </div>
@@ -24,13 +24,13 @@
 
     <!-- LYN: Message Programming -->
     <div v-for="(msg, index) in messages" class="flex w-full">
-      <div class="flex w-60 max-w-60 shrink-0">
+      <div class="flex w-70 max-w-70 shrink-0">
         <ButtonGroup class="grow">
           <Button
-            :label="`${msg.payload.path}`"
+            :label="`${msg.payload.path}: ${msg.payload.arg.value}`"
             @click="togglePopover($event, index)"
             class="justify-start rounded-none font-mono"
-            :pt:label:class="'truncate max-w-34'"
+            :pt:label:class="'truncate max-w-44'"
             fluid
           >
             <template #icon>
@@ -57,7 +57,7 @@
           <div v-if="startingPage + pageOffset < pageCount" class="flex grow">
             <ToggleButton
               v-for="(_, slot) in 4"
-              v-model="msg.actives[pageOffset][slot]"
+              v-model="msg.actives[startingPage + pageOffset][slot]"
               pt:label:class="hidden"
               class="grow"
               :pt:root:class="
@@ -76,7 +76,11 @@
             >
               <template #icon>
                 <span class="material-symbols-rounded">
-                  {{ msg.actives[pageOffset][slot] ? "music_note" : "close" }}
+                  {{
+                    msg.actives[startingPage + pageOffset][slot]
+                      ? "music_note"
+                      : "close"
+                  }}
                 </span>
               </template>
             </ToggleButton>
@@ -135,6 +139,7 @@
             "
           />
           <InputNumber
+            :minFractionDigits="2"
             id="msg-arg"
             v-if="messages![popoverEditingId!].payload.arg.type === 'Float'"
             v-model="messages![popoverEditingId!].payload.arg.value as number"

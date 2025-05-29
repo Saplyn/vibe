@@ -103,21 +103,19 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
                 }
             }
             Ok(cmd) = client_cmd_broadcast_rx.recv() => {
-                respond(&mut socket, cmd).await.unwrap();
+                respond(&mut socket, cmd).await;
             }
             Ok(()) = tick_rx.changed() => {
                 let maybe_tick = *tick_rx.borrow_and_update();
                 if let (Some(tick), max) = maybe_tick {
-                    respond(&mut socket, ClientCommand::TickerTick { tick, max })
-                        .await
-                        .unwrap();
+                    respond(&mut socket, ClientCommand::TickerTick { tick, max }).await;
                 }
             }
             Ok(()) = connection_status_rx.changed() => {
                 let established = *connection_status_rx.borrow_and_update();
                 respond(&mut socket, ClientCommand::CommStatusChanged {
                     established
-                }).await.unwrap();
+                }).await;
             }
 
 
@@ -126,10 +124,18 @@ async fn ws_handler(mut socket: WebSocket, addr: SocketAddr, state: HandlerState
     info!("Client {} disconnected", addr);
 }
 
-async fn respond(socket: &mut WebSocket, cmd: ClientCommand) -> Result<(), axum::Error> {
+fn broadcast(client_cmd_broadcast_tx: &broadcast::Sender<ClientCommand>, cmd: ClientCommand) {
+    if let Err(err) = client_cmd_broadcast_tx.send(cmd) {
+        warn!("Failed to broadcast client command: {}", err);
+    };
+}
+
+async fn respond(socket: &mut WebSocket, cmd: ClientCommand) {
     info!("Sending to client: {:?}", cmd);
-    let cmd = serde_json::to_string(&cmd).unwrap();
-    socket.send(Message::Text(cmd.into())).await
+    let cmd = serde_json::to_string(&cmd).expect("Failed to serialize command");
+    if let Err(err) = socket.send(Message::Text(cmd.into())).await {
+        warn!("Failed to respond to client: {}", err);
+    }
 }
 
 #[derive(Debug)]
@@ -166,9 +172,10 @@ async fn process(arg: ProcessArg<'_>) {
         // LYN: Misc
         ServerCommand::SetProjectName { name: new_name } => {
             *store.name.write().await = new_name.clone();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::ProjectNameUpdated { name: new_name })
-                .unwrap();
+            broadcast(
+                client_cmd_broadcast_tx,
+                ClientCommand::ProjectNameUpdated { name: new_name },
+            );
         }
         ServerCommand::CommChangeAddr { addr: new_addr } => {
             communicator_cmd_tx
@@ -177,9 +184,10 @@ async fn process(arg: ProcessArg<'_>) {
                 })
                 .await
                 .unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::CommAddrChanged { addr: new_addr })
-                .unwrap();
+            broadcast(
+                client_cmd_broadcast_tx,
+                ClientCommand::CommAddrChanged { addr: new_addr },
+            );
         }
         ServerCommand::CtrlChangeContext { context } => {
             if let Some(context) = context {
@@ -197,11 +205,12 @@ async fn process(arg: ProcessArg<'_>) {
                         })
                         .await
                         .unwrap();
-                    client_cmd_broadcast_tx
-                        .send(ClientCommand::CtrlContextChanged {
+                    broadcast(
+                        client_cmd_broadcast_tx,
+                        ClientCommand::CtrlContextChanged {
                             context: Some(context),
-                        })
-                        .unwrap();
+                        },
+                    );
                 } else {
                     // non-exist pattern
                     respond(
@@ -212,8 +221,7 @@ async fn process(arg: ProcessArg<'_>) {
                             detail: format!("Pattern with name \"{}\" does not exist", context),
                         },
                     )
-                    .await
-                    .unwrap();
+                    .await;
                 }
             } else {
                 // Context: track
@@ -221,9 +229,10 @@ async fn process(arg: ProcessArg<'_>) {
                     .send(ControllerCommand::ChangeContext { context: None })
                     .await
                     .unwrap();
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::CtrlContextChanged { context: None })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::CtrlContextChanged { context: None },
+                );
             }
         }
         // LYN: Pattern
@@ -238,22 +247,23 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Pattern with name \"{}\" already exists", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             } else {
                 let pattern = Pattern::new(name.clone());
                 patterns.insert(name.clone(), pattern.clone());
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::PatternAdded { name, pattern })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::PatternAdded { name, pattern },
+                );
             }
         }
         ServerCommand::PatternDelete { name } => {
             let mut patterns = store.patterns.write().await;
             if patterns.remove(&name).is_some() {
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::PatternDeleted { name })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::PatternDeleted { name },
+                );
             } else {
                 respond(
                     socket,
@@ -263,17 +273,17 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Pattern with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::PatternEdit { name, pattern } => {
             let mut patterns = store.patterns.write().await;
             if let Some(existing_pattern) = patterns.get_mut(&name) {
                 *existing_pattern = pattern.clone();
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::PatternEdited { name, pattern })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::PatternEdited { name, pattern },
+                );
             } else {
                 respond(
                     socket,
@@ -283,8 +293,7 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Pattern with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         // LYN: Track
@@ -299,22 +308,23 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Track with name \"{}\" already exists", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             } else {
                 let track = Track::new(name.clone());
                 tracks.insert(name.clone(), track.clone());
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::TrackAdded { name, track })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::TrackAdded { name, track },
+                );
             }
         }
         ServerCommand::TrackDelete { name } => {
             let mut tracks = store.tracks.write().await;
             if tracks.remove(&name).is_some() {
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::TrackDeleted { name })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::TrackDeleted { name },
+                );
             } else {
                 respond(
                     socket,
@@ -324,17 +334,17 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Track with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::TrackEdit { name, track } => {
             let mut tracks = store.tracks.write().await;
             if let Some(existing_track) = tracks.get_mut(&name) {
                 *existing_track = track.clone();
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::TrackEdited { name, track })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::TrackEdited { name, track },
+                );
             } else {
                 respond(
                     socket,
@@ -344,8 +354,7 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Track with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::TrackMakeActive {
@@ -357,15 +366,26 @@ async fn process(arg: ProcessArg<'_>) {
             if let Some(track) = tracks.get_mut(&name) {
                 track.active = active;
                 if force {
-                    let (tick, _) = *tick_rx.borrow();
-                    track.progress = tick.map(|val| val % 4);
+                    if active {
+                        let (tick, _) = *tick_rx.borrow();
+                        track.progress = tick.map(|val| val % 4);
+                    } else {
+                        track.progress = None;
+                    }
                 }
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::TrackMadeActive {
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::TrackMadeActive {
                         name: name.clone(),
                         active,
-                    })
-                    .unwrap();
+                    },
+                );
+                if let Err(err) = client_cmd_broadcast_tx.send(ClientCommand::TrackProgressUpdate {
+                    name: track.name.clone(),
+                    progress: track.progress,
+                }) {
+                    warn!("Failed to broadcast client command: {}", err);
+                };
             } else {
                 respond(
                     socket,
@@ -375,17 +395,17 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Track with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::TrackMakeLoop { name, r#loop } => {
             let mut tracks = store.tracks.write().await;
             if let Some(track) = tracks.get_mut(&name) {
                 track.r#loop = r#loop;
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::TrackMadeLoop { name, r#loop })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::TrackMadeLoop { name, r#loop },
+                );
             } else {
                 respond(
                     socket,
@@ -395,8 +415,7 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Track with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         // LYN: Event
@@ -411,22 +430,23 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Event with name \"{}\" already exists", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             } else {
                 let event = Event::new(name.clone());
                 events.insert(name.clone(), event.clone());
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::EventAdded { name, event })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::EventAdded { name, event },
+                );
             }
         }
         ServerCommand::EventDelete { name } => {
             let mut events = store.events.write().await;
             if events.remove(&name).is_some() {
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::EventDeleted { name })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::EventDeleted { name },
+                );
             } else {
                 respond(
                     socket,
@@ -436,17 +456,17 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Event with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::EventEdit { name, event } => {
             let mut events = store.events.write().await;
             if let Some(existing_event) = events.get_mut(&name) {
                 *existing_event = event.clone();
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::EventEdited { name, event })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::EventEdited { name, event },
+                );
             } else {
                 respond(
                     socket,
@@ -456,8 +476,7 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Event with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::EventFire { name } => {
@@ -471,8 +490,7 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Event with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
                 return;
             };
             communicator_cmd_tx
@@ -497,22 +515,23 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Slider with name \"{}\" already exists", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             } else {
                 let slider = Slider::new(name.clone());
                 sliders.insert(name.clone(), slider.clone());
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::SliderAdded { name, slider })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::SliderAdded { name, slider },
+                );
             }
         }
         ServerCommand::SliderDelete { name } => {
             let mut sliders = store.sliders.write().await;
             if sliders.remove(&name).is_some() {
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::SliderDeleted { name })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::SliderDeleted { name },
+                );
             } else {
                 respond(
                     socket,
@@ -522,17 +541,17 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Slider with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::SliderEdit { name, slider } => {
             let mut sliders = store.sliders.write().await;
             if let Some(existing_slider) = sliders.get_mut(&name) {
                 *existing_slider = slider.clone();
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::SliderEdited { name, slider })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::SliderEdited { name, slider },
+                );
             } else {
                 respond(
                     socket,
@@ -542,17 +561,17 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Slider with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         ServerCommand::SliderSetVal { name, val } => {
             let mut sliders = store.sliders.write().await;
             if let Some(slider) = sliders.get_mut(&name) {
                 slider.val = val;
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::SliderValSet { name, val })
-                    .unwrap();
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::SliderValSet { name, val },
+                );
                 communicator_cmd_tx
                     .send(CommunicatorCommand::SendMessage {
                         msg: MinOscMessage {
@@ -571,36 +590,30 @@ async fn process(arg: ProcessArg<'_>) {
                         detail: format!("Slider with name \"{}\" does not exist", name),
                     },
                 )
-                .await
-                .unwrap();
+                .await;
             }
         }
         // LYN: Ticker
         ServerCommand::TickerPlay => {
             ticker_cmd_tx.send(TickerCommand::Play).await.unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerPlaying)
-                .unwrap();
+            broadcast(client_cmd_broadcast_tx, ClientCommand::TickerPlaying);
         }
         ServerCommand::TickerPause => {
             ticker_cmd_tx.send(TickerCommand::Pause).await.unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerPaused)
-                .unwrap();
+            broadcast(client_cmd_broadcast_tx, ClientCommand::TickerPaused);
         }
         ServerCommand::TickerStop => {
             ticker_cmd_tx.send(TickerCommand::Stop).await.unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerStopped)
-                .unwrap();
+            broadcast(client_cmd_broadcast_tx, ClientCommand::TickerStopped);
             for track in store.tracks.write().await.values_mut() {
                 track.progress = None;
-                client_cmd_broadcast_tx
-                    .send(ClientCommand::TrackProgressUpdate {
+                broadcast(
+                    client_cmd_broadcast_tx,
+                    ClientCommand::TrackProgressUpdate {
                         name: track.name.clone(),
                         progress: None,
-                    })
-                    .unwrap();
+                    },
+                );
             }
         }
         ServerCommand::TickerSetBpm { bpm } => {
@@ -608,9 +621,10 @@ async fn process(arg: ProcessArg<'_>) {
                 .send(TickerCommand::SetBPM { bpm })
                 .await
                 .unwrap();
-            client_cmd_broadcast_tx
-                .send(ClientCommand::TickerBpmUpdated { bpm })
-                .unwrap();
+            broadcast(
+                client_cmd_broadcast_tx,
+                ClientCommand::TickerBpmUpdated { bpm },
+            );
         }
         // LYN: Request
         ServerCommand::RequestTickerBpm => {
@@ -620,8 +634,7 @@ async fn process(arg: ProcessArg<'_>) {
                     bpm: *ticker_state.bpm.read().await,
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestTickerPlaying => {
             respond(
@@ -630,8 +643,7 @@ async fn process(arg: ProcessArg<'_>) {
                     playing: *ticker_state.playing.read().await,
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestTickerTick => {
             let (tick, max) = *tick_rx.borrow();
@@ -642,8 +654,7 @@ async fn process(arg: ProcessArg<'_>) {
                     max,
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestProjectName => {
             respond(
@@ -652,8 +663,7 @@ async fn process(arg: ProcessArg<'_>) {
                     name: store.name.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestCommAddr => {
             respond(
@@ -662,8 +672,7 @@ async fn process(arg: ProcessArg<'_>) {
                     addr: communicator_state.target_addr.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestCommStatus => {
             respond(
@@ -672,8 +681,7 @@ async fn process(arg: ProcessArg<'_>) {
                     established: *communicator_state.connected.read().await,
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestAllTracks => {
             respond(
@@ -682,8 +690,7 @@ async fn process(arg: ProcessArg<'_>) {
                     tracks: store.tracks.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestAllPatterns => {
             respond(
@@ -692,8 +699,7 @@ async fn process(arg: ProcessArg<'_>) {
                     patterns: store.patterns.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestCtrlContext => {
             respond(
@@ -702,8 +708,7 @@ async fn process(arg: ProcessArg<'_>) {
                     context: controller_state.context.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestAllEvents => {
             respond(
@@ -712,8 +717,7 @@ async fn process(arg: ProcessArg<'_>) {
                     events: store.events.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
         ServerCommand::RequestAllSliders => {
             respond(
@@ -722,8 +726,7 @@ async fn process(arg: ProcessArg<'_>) {
                     sliders: store.sliders.read().await.clone(),
                 },
             )
-            .await
-            .unwrap();
+            .await;
         }
     }
 }

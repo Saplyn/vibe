@@ -4,6 +4,10 @@ pub mod info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
+fn built_time() -> built::chrono::DateTime<built::chrono::Local> {
+    built::util::strptime(info::BUILT_TIME_UTC).with_timezone(&built::chrono::offset::Local)
+}
+
 pub fn print_built_info() {
     let same_arch = info::TARGET == info::HOST;
 
@@ -21,6 +25,6 @@ pub fn print_built_info() {
         }
         print!(" {}", platform.bright_magenta().bold());
     }
-    print!(" at {}", info::BUILT_TIME_UTC.bright_cyan().bold());
+    print!(" at {}", built_time().bright_cyan().bold());
     println!(".");
 }

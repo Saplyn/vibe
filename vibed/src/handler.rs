@@ -368,7 +368,7 @@ async fn process(arg: ProcessArg<'_>) {
                 if force {
                     if active {
                         let (tick, _) = *tick_rx.borrow();
-                        track.progress = tick.map(|val| val % 4);
+                        track.progress = tick.map(|val| val % 16);
                     } else {
                         track.progress = None;
                     }

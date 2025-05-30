@@ -247,6 +247,11 @@ watch([cmd, watchableResp], ([cmd, _]) => {
 // LYN: Events
 
 const events = ref<Record<string, Event>>();
+const sortedEvents = computed(() => {
+  const entries = Object.entries(get(events) ?? {});
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return Object.fromEntries(entries) as Record<string, Event>;
+});
 const addEvent = (name: string) =>
   send({ action: "EventAdd", payload: { name } });
 const delEvent = (name: string) =>
@@ -265,7 +270,7 @@ export type EventState = {
   fireEvent: (name: string) => void;
 };
 provide<EventState>("event-state", {
-  events: readonly(events),
+  events: readonly(sortedEvents),
   addEvent,
   delEvent,
   editEvent,
@@ -296,6 +301,11 @@ watch([cmd, watchableResp], ([cmd, _]) => {
 // LYN: Sliders
 
 const sliders = ref<Record<string, Slider>>();
+const sortedSliders = computed(() => {
+  const entries = Object.entries(get(sliders) ?? {});
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return Object.fromEntries(entries) as Record<string, Slider>;
+});
 const addSlider = (name: string) =>
   send({ action: "SliderAdd", payload: { name } });
 const delSlider = (name: string) =>
@@ -314,7 +324,7 @@ export type SliderState = {
   setSliderVal: (name: string, val: number) => void;
 };
 provide<SliderState>("slider-state", {
-  sliders: readonly(sliders),
+  sliders: readonly(sortedSliders),
   addSlider,
   delSlider,
   editSlider,

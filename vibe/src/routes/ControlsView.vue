@@ -136,7 +136,11 @@
         <div
           class="border-surface flex gap-2 border-t-4 border-dotted px-4 py-2"
         >
-          <Button @click="addSliderWrapper()" label="Add New Slider">
+          <Button
+            @click="addSliderWrapper()"
+            label="Add New Slider"
+            :disabled="sliderNameToAdd == ''"
+          >
             <template #icon>
               <span class="material-symbols-rounded">playlist_add</span>
             </template>

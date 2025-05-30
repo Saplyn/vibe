@@ -2,7 +2,7 @@
   <div class="h-full">
     <BlockUI class="flex h-full w-full flex-col" :blocked="!connected">
       <div
-        class="border-surface flex min-h-[62px] items-center gap-2 border-b-4 border-dotted px-4 py-2"
+        class="border-surface dark:bg-surface-800 bg-surface-100 sticky top-0 z-50 flex min-h-[62px] items-center gap-2 border-b-4 border-dotted px-4 py-2"
       >
         <!-- LYN: Add New Track -->
         <Button

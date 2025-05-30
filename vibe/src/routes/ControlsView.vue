@@ -77,9 +77,7 @@
             v-for="slider in sliders"
             class="dark:bg-surface-800 bg-surface-100 flex min-h-96 flex-col gap-2 rounded-lg p-2"
           >
-            <div
-              class="flex grow items-center justify-center font-mono text-xl"
-            >
+            <div class="flex grow items-center justify-center font-mono">
               {{ slider.name }}
             </div>
 

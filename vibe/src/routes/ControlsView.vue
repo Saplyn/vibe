@@ -35,14 +35,19 @@
         <!-- LYN: Event List -->
         <div class="flex h-full flex-wrap gap-2 overflow-auto p-2">
           <div
-            class="flex h-1/3 min-h-30 w-1/12 flex-col"
             v-for="event in events"
+            class="border-surface flex h-1/3 min-h-30 w-1/12 flex-col rounded-lg border-2"
+            :style="
+              event.color != null
+                ? `border-color: ${event.color} !important;`
+                : ''
+            "
           >
             <Button
-              class="min-h-10 grow rounded-b-none"
+              class="z-[-50] min-h-10 grow rounded-t-md rounded-b-none"
               @click="fireEvent(event.name)"
             >
-              <div class="flex flex-col font-mono">
+              <div class="flex flex-col border-0 font-mono">
                 <div class="pt-2 text-xl">{{ event.name }}</div>
                 <kbd
                   class="border-primary-500 rounded-lg border-2"
@@ -55,7 +60,12 @@
 
             <Button
               @click="toggleEventPopover($event, event.name)"
-              class="w-full rounded-t-none"
+              class="w-full rounded-none border-0"
+              :style="
+                event.color != null
+                  ? `background-color: color-mix(in oklab, ${event.color} 20%, transparent);`
+                  : ''
+              "
               variant="outlined"
             >
               <template #icon>
@@ -75,7 +85,12 @@
         <div class="flex grow gap-2 overflow-auto p-2">
           <div
             v-for="slider in sliders"
-            class="dark:bg-surface-800 bg-surface-100 flex min-h-96 flex-col gap-2 rounded-lg p-2"
+            class="dark:bg-surface-800 bg-surface-100 border-surface flex min-h-96 !flex-col gap-2 rounded-lg border-2 p-2"
+            :style="
+              slider.color != null
+                ? `border-color: ${slider.color} !important;`
+                : ''
+            "
           >
             <div class="flex grow items-center justify-center font-mono">
               {{ slider.name }}
@@ -133,6 +148,7 @@
           </div>
         </div>
 
+        <!-- LYN: Add Slider -->
         <div
           class="border-surface flex gap-2 border-t-4 border-dotted px-4 py-2"
         >
@@ -224,7 +240,6 @@
         </div>
       </div>
     </Popover>
-    <div>{{ shortcutKeys }}</div>
   </BlockUI>
 </template>
 
@@ -265,7 +280,7 @@ function addSliderWrapper() {
   addSlider(get(sliderNameToAdd));
   set(sliderNameToAdd, "");
 }
-const sliders = ref();
+const sliders = ref<Record<string, SliderModel>>();
 watch(
   readonlySliders,
   (readonlySliders) => {
@@ -394,9 +409,9 @@ function delEventWrapper(name?: string) {
 }
 
 // LYN: Event Shortcut
-const shortcutKeys = computed(() => {
-  return Object.values(get(events) ?? {}).map((event) => event.shortcut);
-});
+// const shortcutKeys = computed(() => {
+//   return Object.values(get(events) ?? {}).map((event) => event.shortcut);
+// });
 onKeyStroke(
   (_: KeyboardEvent) => {
     return true;

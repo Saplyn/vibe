@@ -26,7 +26,14 @@
       <div class="flex flex-col gap-4 p-4">
         <div v-for="track in tracks" class="flex gap-2">
           <div class="flex h-20 w-80 min-w-50">
-            <ButtonGroup class="grow">
+            <ButtonGroup
+              class="outline-surface-300 dark:outline-surface-600 grow rounded-lg outline-2"
+              :style="
+                track.color != null
+                  ? `outline-color: ${track.color} !important;`
+                  : ''
+              "
+            >
               <!-- LYN: Make Active -->
               <Button
                 class="border-surface grow basis-3/4 justify-start border-1"

@@ -72,6 +72,7 @@ pub struct Track {
     pub r#loop: bool,
     pub progress: Option<usize>,
     pub patterns: Vec<String>,
+    pub color: Option<String>,
 }
 
 fn mod_beat(total_length: usize, beat: usize) -> usize {
@@ -92,6 +93,7 @@ impl Track {
             r#loop: false,
             progress: None,
             patterns: Vec::new(),
+            color: None,
         }
     }
     pub async fn get_osc_messages_and_advance(
@@ -163,6 +165,7 @@ pub struct Event {
     pub path: String,
     pub shortcut: Option<String>,
     pub payload: MinOscArg,
+    pub color: Option<String>,
 }
 
 impl Event {
@@ -172,6 +175,7 @@ impl Event {
             path: String::from("/"),
             shortcut: None,
             payload: MinOscArg::default(),
+            color: None,
         }
     }
 }
@@ -185,6 +189,7 @@ pub struct Slider {
     pub val: f32,
     pub max: f32,
     pub min: f32,
+    pub color: Option<String>,
 }
 
 impl Slider {
@@ -195,6 +200,7 @@ impl Slider {
             val: 0.0,
             max: 1.0,
             min: 0.0,
+            color: None,
         }
     }
 }

@@ -19,6 +19,7 @@ export type Track = {
   loop: boolean;
   progress: number | null;
   patterns: string[];
+  color: string | null;
 };
 
 export type Event = {
@@ -26,6 +27,7 @@ export type Event = {
   path: string;
   shortcut: string | null;
   payload: MinOscArg;
+  color: string | null;
 };
 
 export type Slider = {
@@ -34,6 +36,7 @@ export type Slider = {
   val: number;
   max: number;
   min: number;
+  color: string | null;
 };
 
 export type MinOscMessage = {

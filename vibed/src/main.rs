@@ -29,7 +29,7 @@ mod ticker;
 const VIBED_SERVER_ADDR: &str = "0.0.0.0:8000";
 const DEFAULT_BPM: f32 = 120.0;
 const DEFAULT_NAME: &str = "Unnamed";
-const DEFAULT_TARGET_ADDR: &str = "127.0.0.1:3000";
+const DEFAULT_TARGET_ADDR: &str = "127.0.0.1:8001";
 static DEFAULT_SAVE_PATH: &str = "./vibe-store.json";
 
 #[tokio::main]

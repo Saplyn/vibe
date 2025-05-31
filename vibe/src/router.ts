@@ -3,7 +3,8 @@ import { createMemoryHistory, createRouter, RouteRecordRaw } from "vue-router";
 import ProjectView from "./routes/ProjectView.vue";
 import TracksView from "./routes/TracksView.vue";
 import PatternsView from "./routes/PatternsView.vue";
-import ControlsView from "./routes/ControlsView.vue";
+import SlidersView from "./routes/SlidersView.vue";
+import EventsView from "./routes/EventsView.vue";
 
 const routes: RouteRecordRaw[] = [
   {
@@ -25,10 +26,16 @@ const routes: RouteRecordRaw[] = [
     component: PatternsView,
   },
   {
-    path: "/controls",
-    name: "Controls",
+    path: "/sliders",
+    name: "Sliders",
     meta: { icon: "instant_mix", edit: false },
-    component: ControlsView,
+    component: SlidersView,
+  },
+  {
+    path: "/events",
+    name: "Events",
+    meta: { icon: "auto_read_play", edit: false },
+    component: EventsView,
   },
 ];
 

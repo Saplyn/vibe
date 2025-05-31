@@ -60,8 +60,14 @@
           @click="toggleDisableEdit()"
           :variant="disableEdit ? 'outlined' : ''"
           fluid
-          :label="disableEdit ? 'Enable Editing' : 'Disable Editing'"
-        />
+          :label="disableEdit ? 'Not Editing' : 'Currently Editing'"
+        >
+          <template #icon>
+            <span class="material-symbols-rounded">
+              {{ disableEdit ? "edit_off" : "edit" }}
+            </span>
+          </template>
+        </Button>
       </div>
     </div>
   </div>

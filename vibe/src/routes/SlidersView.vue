@@ -1,6 +1,28 @@
 <template>
   <BlockUI class="flex h-full w-full" :blocked="!connected">
     <div class="flex h-full w-full flex-col justify-between">
+      <!-- LYN: Add Slider -->
+      <div class="border-surface flex gap-2 border-t-4 border-dotted px-4 py-2">
+        <Button
+          @click="addSliderWrapper()"
+          label="Add New Slider"
+          :disabled="sliderNameToAdd == ''"
+        >
+          <template #icon>
+            <span class="material-symbols-rounded">playlist_add</span>
+          </template>
+        </Button>
+        <FloatLabel class="grow" variant="on">
+          <InputText
+            fluid
+            :disabled="!connected"
+            v-model="sliderNameToAdd"
+            ref="addSliderButtonRef"
+          />
+          <label>New slider name</label>
+        </FloatLabel>
+      </div>
+
       <VirtualScroller
         :items="sliderArray"
         :item-size="253"
@@ -20,7 +42,7 @@
           >
             <!-- LYN: Name -->
             <div
-              class="flex items-center justify-center p-4 text-center font-mono text-2xl"
+              class="flex h-30 items-center justify-center p-4 text-center font-mono text-2xl"
             >
               {{ slider.name }}
             </div>
@@ -90,28 +112,6 @@
           </div>
         </template>
       </VirtualScroller>
-
-      <!-- LYN: Add Slider -->
-      <div class="border-surface flex gap-2 border-t-4 border-dotted px-4 py-2">
-        <Button
-          @click="addSliderWrapper()"
-          label="Add New Slider"
-          :disabled="sliderNameToAdd == ''"
-        >
-          <template #icon>
-            <span class="material-symbols-rounded">playlist_add</span>
-          </template>
-        </Button>
-        <FloatLabel class="grow" variant="on">
-          <InputText
-            fluid
-            :disabled="!connected"
-            v-model="sliderNameToAdd"
-            ref="addSliderButtonRef"
-          />
-          <label>New slider name</label>
-        </FloatLabel>
-      </div>
     </div>
   </BlockUI>
 </template>

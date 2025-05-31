@@ -75,6 +75,11 @@
           <label>Shortcut</label>
         </FloatLabel>
 
+        <FloatLabel variant="on">
+          <InputText v-model="eventEditing!.color" />
+          <label>Color</label>
+        </FloatLabel>
+
         <SelectButton
           v-model="eventEditing!.payload.type"
           :options="eventTypeOpts"

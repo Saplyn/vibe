@@ -19,7 +19,9 @@
             "
           >
             <!-- LYN: Name -->
-            <div class="flex items-center justify-center p-4 font-mono">
+            <div
+              class="flex items-center justify-center p-4 text-center font-mono text-2xl"
+            >
               {{ slider.name }}
             </div>
 

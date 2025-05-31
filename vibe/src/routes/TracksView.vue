@@ -29,7 +29,7 @@
             <ButtonGroup
               class="outline-surface-300 dark:outline-surface-600 grow rounded-lg outline-2"
               :style="
-                track.color != null
+                track.color != null || track.color != ''
                   ? `outline-color: ${track.color} !important;`
                   : ''
               "

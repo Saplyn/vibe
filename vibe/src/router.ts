@@ -9,25 +9,25 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/",
     name: "Project",
-    meta: { icon: "settings" },
+    meta: { icon: "settings", edit: false },
     component: ProjectView,
   },
   {
     path: "/tracks",
     name: "Tracks",
-    meta: { icon: "queue_music" },
+    meta: { icon: "queue_music", edit: false },
     component: TracksView,
   },
   {
     path: "/patterns",
     name: "Patterns",
-    meta: { icon: "library_music" },
+    meta: { icon: "library_music", edit: true },
     component: PatternsView,
   },
   {
     path: "/controls",
     name: "Controls",
-    meta: { icon: "instant_mix" },
+    meta: { icon: "instant_mix", edit: false },
     component: ControlsView,
   },
 ];

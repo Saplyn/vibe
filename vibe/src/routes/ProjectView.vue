@@ -53,13 +53,23 @@
           <span>Remote Server</span>
         </InputGroupAddon>
       </InputGroup>
+
+      <!-- LYN: Enabling Patterns Tab -->
+      <div class="flex items-center justify-center">
+        <Button
+          @click="toggleDisableEdit()"
+          :variant="disableEdit ? 'outlined' : ''"
+          fluid
+          :label="disableEdit ? 'Enable Editing' : 'Disable Editing'"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { inject, ref, watch } from "vue";
-import { CommInfo, ProjectInfo, Vibed } from "../App.vue";
+import { CommInfo, DisableEdit, ProjectInfo, Vibed } from "../App.vue";
 import { get, set } from "@vueuse/core";
 
 // LYN: Communication Addr
@@ -93,4 +103,8 @@ watch(projectName, (newName) => {
     changeName(newName);
   }
 });
+
+// LYN: Disable Edit
+const { disabled: disableEdit, toggle: toggleDisableEdit } =
+  inject<DisableEdit>("disable-edit")!;
 </script>

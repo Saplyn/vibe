@@ -20,6 +20,7 @@
             : 'font-bold hidden md:inline'
         "
         :label="route.name?.toString()"
+        :disabled="disableEdit && (route.meta.edit as boolean)"
         @click="$router.push(route.path)"
       >
         <template #icon>
@@ -493,5 +494,21 @@ watch(connected, async (connected) => {
     set(events, undefined);
     set(sliders, undefined);
   }
+});
+
+// LYN: Disable Edit
+const disableEdit = ref(true);
+export type DisableEdit = {
+  disabled: DeepReadonly<UnwrapNestedRefs<Ref<boolean, boolean>>>;
+  toggle: (val?: boolean) => void;
+};
+provide<DisableEdit>("disable-edit", {
+  disabled: readonly(disableEdit),
+  toggle: (val?: boolean) => {
+    if (val != undefined) {
+      set(disableEdit, val);
+    }
+    set(disableEdit, !get(disableEdit));
+  },
 });
 </script>

@@ -29,7 +29,7 @@
           v-for="event in events"
           class="border-surface flex h-1/5 min-h-30 w-1/12 flex-col rounded-lg border-2"
           :style="
-            event.color != null || event.color != ""
+            event.color != null || event.color != ''
               ? `border-color: ${event.color} !important;`
               : ''
           "
@@ -53,7 +53,7 @@
             @click="toggleEventPopover($event, event.name)"
             class="w-full rounded-none border-0"
             :style="
-            event.color != null || event.color != ""
+              event.color != null || event.color != ''
                 ? `background-color: color-mix(in oklab, ${event.color} 20%, transparent);`
                 : ''
             "

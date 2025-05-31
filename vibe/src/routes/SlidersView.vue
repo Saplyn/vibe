@@ -13,7 +13,7 @@
           <div
             class="dark:bg-surface-800 bg-surface-100 border-surface flex flex-col justify-between gap-2 rounded-lg border-2 p-2"
             :style="
-              slider.color != null || slider.color != ""
+              slider.color != null || slider.color != ''
                 ? `border-color: ${slider.color} !important;`
                 : ''
             "

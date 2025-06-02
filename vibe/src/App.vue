@@ -1,6 +1,7 @@
 <template>
   <div class="flex h-screen w-screen flex-col justify-between">
     <PlayControlBar />
+    <TracksBanner />
 
     <main class="grow overflow-auto">
       <RouterView />

@@ -6,6 +6,7 @@ import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import ToastService from "primevue/toastservice";
 import ConfirmationService from "primevue/confirmationservice";
+import { autoAnimatePlugin } from "@formkit/auto-animate/vue";
 
 import "./tailwind.css";
 import "primeicons/primeicons.css";
@@ -46,4 +47,5 @@ createApp(App)
   .use(router)
   .use(ToastService)
   .use(ConfirmationService)
+  .use(autoAnimatePlugin)
   .mount("#app");

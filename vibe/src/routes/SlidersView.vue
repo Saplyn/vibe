@@ -2,7 +2,7 @@
   <BlockUI class="flex h-full w-full" :blocked="!connected">
     <div class="flex h-full w-full flex-col justify-between">
       <!-- LYN: Add Slider -->
-      <div class="border-surface flex gap-2 border-t-4 border-dotted px-4 py-2">
+      <div class="border-surface flex gap-2 border-b-4 border-dotted px-4 py-2">
         <Button
           @click="addSliderWrapper()"
           label="Add New Slider"

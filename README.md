@@ -1,3 +1,9 @@
+# [ Project Archived ]
+
+This is an application I developed for my Sound and Music Computing course's final LENS performance, and it has completed its mession. Archiving as freezing the developing status. If you are interested in this project, feel free to fork it. Some of my design decisions are located under the `design/` folder for your reference.
+
+---
+
 # Vibe Kit
 
 ## Features
